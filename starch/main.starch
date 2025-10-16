@@ -1,0 +1,3 @@
+function do_thing(item or "Hello, World!") -> void {
+	item ~> print();
+}

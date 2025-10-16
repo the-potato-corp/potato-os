@@ -1,0 +1,151 @@
+[gd_scene load_steps=10 format=3 uid="uid://ced4kn3snqy57"]
+
+[ext_resource type="Script" uid="uid://dk064h737epkf" path="res://test.gd" id="1_0fbet"]
+[ext_resource type="Texture2D" uid="uid://ct6ahw64ssugn" path="res://assets/start.png" id="2_62e2m"]
+[ext_resource type="Texture2D" uid="uid://c80v8qbsb4caw" path="res://assets/wallpaper.jpeg" id="2_qtu10"]
+[ext_resource type="PackedScene" uid="uid://cy5thg8ft6pdp" path="res://app.tscn" id="3_kbped"]
+[ext_resource type="Texture2D" uid="uid://dbp5prnqa5baj" path="res://assets/power.svg" id="4_fj5cn"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_62e2m"]
+bg_color = Color(0.23921569, 0.19607843, 0.14901961, 1)
+border_width_left = 10
+border_width_top = 10
+border_width_bottom = 70
+border_color = Color(0.8, 0.8, 0.8, 0)
+corner_radius_top_left = 20
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 20
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_iy58a"]
+bg_color = Color(0.2901961, 0.2509804, 0.20392157, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_6a6wx"]
+content_margin_left = 10.0
+content_margin_right = 10.0
+bg_color = Color(0.16470589, 0.13725491, 0.10980392, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_0fbet"]
+content_margin_left = 10.0
+bg_color = Color(0, 0, 0, 1)
+
+[node name="Control" type="Control" node_paths=PackedStringArray("start_button", "start_menu")]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_0fbet")
+start_button = NodePath("Taskbar/HBoxContainer/StartButton")
+start_menu = NodePath("StartMenu")
+
+[node name="Wallpaper" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("2_qtu10")
+expand_mode = 5
+
+[node name="StartMenu" type="PanelContainer" parent="."]
+custom_minimum_size = Vector2(300, 500)
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_top = -500.0
+offset_right = 300.0
+grow_vertical = 0
+theme_override_styles/panel = SubResource("StyleBoxFlat_62e2m")
+
+[node name="SearchBar" type="LineEdit" parent="StartMenu"]
+layout_mode = 2
+size_flags_vertical = 0
+theme_override_colors/font_color = Color(0.9098039, 0.8627451, 0.78431374, 1)
+theme_override_styles/normal = SubResource("StyleBoxFlat_iy58a")
+placeholder_text = "Search..."
+context_menu_enabled = false
+emoji_menu_enabled = false
+shortcut_keys_enabled = false
+
+[node name="MarginContainer" type="MarginContainer" parent="StartMenu"]
+layout_mode = 2
+theme_override_constants/margin_top = 32
+theme_override_constants/margin_bottom = 50
+
+[node name="ScrollContainer" type="ScrollContainer" parent="StartMenu/MarginContainer"]
+layout_mode = 2
+
+[node name="Apps" type="VBoxContainer" parent="StartMenu/MarginContainer/ScrollContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="App" parent="StartMenu/MarginContainer/ScrollContainer/Apps" instance=ExtResource("3_kbped")]
+layout_mode = 2
+
+[node name="App2" parent="StartMenu/MarginContainer/ScrollContainer/Apps" instance=ExtResource("3_kbped")]
+layout_mode = 2
+
+[node name="App3" parent="StartMenu/MarginContainer/ScrollContainer/Apps" instance=ExtResource("3_kbped")]
+layout_mode = 2
+
+[node name="App4" parent="StartMenu/MarginContainer/ScrollContainer/Apps" instance=ExtResource("3_kbped")]
+layout_mode = 2
+
+[node name="App5" parent="StartMenu/MarginContainer/ScrollContainer/Apps" instance=ExtResource("3_kbped")]
+layout_mode = 2
+
+[node name="App6" parent="StartMenu/MarginContainer/ScrollContainer/Apps" instance=ExtResource("3_kbped")]
+layout_mode = 2
+
+[node name="App7" parent="StartMenu/MarginContainer/ScrollContainer/Apps" instance=ExtResource("3_kbped")]
+layout_mode = 2
+
+[node name="Power" type="PanelContainer" parent="StartMenu"]
+custom_minimum_size = Vector2(0, 50)
+layout_mode = 2
+size_flags_vertical = 8
+theme_override_styles/panel = SubResource("StyleBoxFlat_6a6wx")
+
+[node name="Label" type="Label" parent="StartMenu/Power"]
+layout_mode = 2
+size_flags_horizontal = 0
+size_flags_vertical = 1
+theme_override_colors/font_color = Color(0.9098039, 0.8627451, 0.78431374, 1)
+text = "John Smith"
+vertical_alignment = 1
+
+[node name="TextureButton" type="TextureButton" parent="StartMenu/Power"]
+custom_minimum_size = Vector2(50, 0)
+layout_mode = 2
+size_flags_horizontal = 8
+texture_normal = ExtResource("4_fj5cn")
+stretch_mode = 6
+
+[node name="Taskbar" type="PanelContainer" parent="."]
+custom_minimum_size = Vector2(0, 64)
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -64.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_styles/panel = SubResource("StyleBoxFlat_0fbet")
+
+[node name="HBoxContainer" type="HBoxContainer" parent="Taskbar"]
+layout_mode = 2
+
+[node name="StartButton" type="TextureButton" parent="Taskbar/HBoxContainer"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(50, 0)
+layout_mode = 2
+toggle_mode = true
+texture_normal = ExtResource("2_62e2m")
+
+[connection signal="toggled" from="Taskbar/HBoxContainer/StartButton" to="." method="_on_start_toggled"]
