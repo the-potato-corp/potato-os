@@ -1,3 +1,4 @@
-function do_thing(item or "Hello, World!") -> void {
-	item ~> print();
+var b: array = [0, 1, 2, 3];
+for (i in b) {
+	print(i);
 }

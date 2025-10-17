@@ -587,22 +587,48 @@ func parse_primary() -> ASTNode:
 		"LBrack":
 			var pos: Vector2i = current_token.get_position()
 			advance()
-			var items: Array = []
 			
 			if current_token and current_token.type == "RBrack":
 				advance()
-				return ASTArrayLiteral.new(items, pos)
+				return ASTArrayLiteral.new([], pos)
+			
+			# Parse first expression
+			var first_expr = parse_expression()
+			if not first_expr:
+				return null
+			
+			if not current_token:
+				log_text("error", "Unexpected end of input")
+				return null
+			
+			# Check if it's a range [start..end] or [start..end..step]
+			if current_token.type == "Range":
+				advance()  # consume ".."
+				
+				var end_expr = parse_expression()
+				if not end_expr:
+					return null
+				
+				var step_expr = null
+				
+				# Check for step [start..end..step]
+				if current_token and current_token.type == "Range":
+					advance()  # consume second ".."
+					step_expr = parse_expression()
+					if not step_expr:
+						return null
+				
+				if not current_token or current_token.type != "RBrack":
+					log_text("error", "Expected ']' after range")
+					return null
+				advance()
+				
+				return ASTRangeLiteral.new(first_expr, end_expr, step_expr, pos)
+			
+			# Otherwise it's an array literal
+			var items: Array = [first_expr]
 			
 			while current_token:
-				var expr = parse_expression()
-				if not expr:
-					return null
-				items.append(expr)
-				
-				if not current_token:
-					log_text("error", "Unexpected end of input in array literal")
-					return null
-				
 				if current_token.type == "RBrack":
 					advance()
 					return ASTArrayLiteral.new(items, pos)
@@ -611,6 +637,11 @@ func parse_primary() -> ASTNode:
 					if current_token and current_token.type == "RBrack":
 						advance()
 						return ASTArrayLiteral.new(items, pos)
+					
+					var expr = parse_expression()
+					if not expr:
+						return null
+					items.append(expr)
 				else:
 					log_text("error", "Expected ',' or ']' in array literal but got '%s' at line %s, column %s" % current_token.get_data())
 					return null

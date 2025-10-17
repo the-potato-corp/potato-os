@@ -23,3 +23,10 @@ func _ready() -> void:
 			var program: Program = parser.get_program()
 			for statement in program.statements:
 				print(statement.serialise())
+			print()
+			var interpreter: Interpreter = Interpreter.new()
+			var result: EvalError = interpreter.run(program)
+			if result.type != OK:
+				print("Eval Error: %s" % result.message)
+			else:
+				print(result.type)

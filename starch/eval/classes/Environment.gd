@@ -12,6 +12,9 @@ func define(name: String, value: Variant, is_const: bool = false) -> void:
 	if is_const:
 		constants.append(name)
 
+func has(name: String):
+	return variables.has(name)
+
 func get_var(name: String):
 	if variables.has(name):
 		return variables[name]

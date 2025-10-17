@@ -12,4 +12,4 @@ func _init(start: ASTNode, end: ASTNode, step: ASTNode, position: Vector2i) -> v
 	self.step = step
 
 func serialise():
-	return "RangeLiteral(%s, %s, %s)" % [start.serialise(), end.serialise(), step.serialise()]
+	return "RangeLiteral(%s, %s, %s)" % [start.serialise(), end.serialise(), (step.serialise() if step else "")]

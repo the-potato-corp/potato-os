@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://dnpy061ln7mr6"]
+
+[ext_resource type="Script" uid="uid://dqfqg1iyap2cs" path="res://installation/installer.gd" id="1_hjvc4"]
+
+[node name="Installer" type="Node"]
+script = ExtResource("1_hjvc4")
