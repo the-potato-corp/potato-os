@@ -30,3 +30,6 @@ func set_var(name: String, value: Variant) -> void:
 		return
 	if variables.has(name):
 		variables[name] = value
+
+func can_set(name: String) -> bool:
+	return name not in constants

@@ -9,6 +9,7 @@ var should_break: bool = false
 var should_continue: bool = false
 var should_return: bool = false
 var return_value = null
+var last_error: EvalError = null
 
 func _init() -> void:
 	global_env = EvalEnvironment.new()
@@ -55,8 +56,6 @@ func setup_builtins() -> void:
 		if args.size() > 0:
 			return type_string(typeof(args[0]))
 		return "unknown"
-
-var last_error: EvalError = null
 
 func raise_error(error: EvalError) -> void:
 	push_error(error.message)
@@ -182,7 +181,6 @@ func eval_var_declaration(node: ASTVarDeclaration):
 	
 	if node.type_hint and node.type_hint != "":
 		if not check_type(value, node.type_hint):
-			raise_error(EvalError.new(EvalError.TYPE_ERROR, "Type mismatch: expected %s, got %s" % [node.type_hint, type_string(typeof(value))]))
 			return null
 	
 	current_env.define(node.name, value, node.is_const)
@@ -191,21 +189,52 @@ func eval_var_declaration(node: ASTVarDeclaration):
 func check_type(value, type_hint: String) -> bool:
 	match type_hint:
 		"str":
-			return typeof(value) == TYPE_STRING
-		"int":
-			return typeof(value) == TYPE_INT
-		"float":
-			return typeof(value) in [TYPE_FLOAT, TYPE_INT]
-		"bool":
-			return typeof(value) == TYPE_BOOL
-		"void":
-			return value == null
-		"array":
-			return typeof(value) == TYPE_ARRAY
-		"dict":
-			return typeof(value) == TYPE_DICTIONARY
-		_:
+			if typeof(value) != TYPE_STRING:
+				raise_error(EvalError.new(EvalError.TYPE_ERROR, "Type mismatch: expected str, got %s" % type_string(typeof(value))))
+				return false
 			return true
+		"int":
+			if typeof(value) != TYPE_INT:
+				raise_error(EvalError.new(EvalError.TYPE_ERROR, "Type mismatch: expected int, got %s" % type_string(typeof(value))))
+				return false
+			return true
+		"float":
+			if typeof(value) not in [TYPE_FLOAT, TYPE_INT]:
+				raise_error(EvalError.new(EvalError.TYPE_ERROR, "Type mismatch: expected float, got %s" % type_string(typeof(value))))
+				return false
+			return true
+		"bool":
+			if typeof(value) != TYPE_BOOL:
+				raise_error(EvalError.new(EvalError.TYPE_ERROR, "Type mismatch: expected bool, got %s" % type_string(typeof(value))))
+				return false
+			return true
+		"void":
+			if value != null:
+				raise_error(EvalError.new(EvalError.TYPE_ERROR, "Type mismatch: expected void, got %s" % type_string(typeof(value))))
+				return false
+			return true
+		"array":
+			if typeof(value) != TYPE_ARRAY:
+				raise_error(EvalError.new(EvalError.TYPE_ERROR, "Type mismatch: expected array, got %s" % type_string(typeof(value))))
+				return false
+			return true
+		"dict":
+			if typeof(value) != TYPE_DICTIONARY:
+				raise_error(EvalError.new(EvalError.TYPE_ERROR, "Type mismatch: expected dict, got %s" % type_string(typeof(value))))
+				return false
+			return true
+		_:
+			if classes.has(type_hint):
+				if value is StarchInstance:
+					if value.name_class != type_hint:
+						raise_error(EvalError.new(EvalError.TYPE_ERROR, "Type mismatch: expected %s, got %s" % [type_hint, value.name_class]))
+						return false
+					return true
+				else:
+					raise_error(EvalError.new(EvalError.TYPE_ERROR, "Type mismatch: expected %s, got %s" % [type_hint, type_string(typeof(value))]))
+					return false
+			raise_error(EvalError.new(EvalError.NAME_ERROR, "Type '%s' is not defined" % type_hint))
+			return false
 
 func type_string(type_id: int) -> String:
 	match type_id:
@@ -246,13 +275,16 @@ func eval_function_call(node: ASTFunctionCall):
 		if had_error:
 			return null
 		
-		var method_name = callee.property
+		var method_name = callee.member
 		
 		var args = []
 		for arg in node.arguments:
 			args.append(eval(arg))
 			if had_error:
 				return null
+		
+		if obj is StarchInstance:
+			return call_instance_method(obj, method_name, args)
 		
 		return call_method(obj, method_name, args)
 	
@@ -305,7 +337,6 @@ func call_user_function(func_def: ASTFunctionDeclaration, arguments: Array, call
 		
 		if param.type_hint and param.type_hint != "":
 			if not check_type(value, param.type_hint):
-				raise_error(EvalError.new(EvalError.TYPE_ERROR, "Parameter '%s': expected %s, got %s" % [param.name, param.type_hint, type_string(typeof(value))]))
 				return null
 		
 		new_env.define(param.name, value, false)
@@ -330,7 +361,6 @@ func call_user_function(func_def: ASTFunctionDeclaration, arguments: Array, call
 	
 	if func_def.return_type and func_def.return_type != "" and func_def.return_type != "void":
 		if not check_type(result, func_def.return_type):
-			raise_error(EvalError.new(EvalError.TYPE_ERROR, "Function '%s': expected return type %s, got %s" % [func_def.name, func_def.return_type, type_string(typeof(result))]))
 			return null
 	
 	return result
@@ -372,6 +402,47 @@ func eval_assignment(node: ASTAssignment):
 			current_env.set_var(target_name, current / value)
 		
 		return value
+	
+	elif target is ASTMemberAccess:
+		var obj = eval(target.object)
+		if had_error:
+			return null
+		
+		if obj is StarchInstance:
+			if not obj.env.has(target.member):
+				raise_error(EvalError.new(EvalError.ATTRIBUTE_ERROR, "Instance of '%s' has no attribute '%s'" % [obj.name_class, target.member]))
+				return null
+			
+			if not obj.env.can_set(target.member):
+				raise_error(EvalError.new(EvalError.TYPE_ERROR, "cannot reassign constant '%s'" % target.member))
+				return null
+			
+			if node.operator == "=":
+				obj.env.set_var(target.member, value)
+			elif node.operator == "+=":
+				var current = obj.env.get_var(target.member)
+				obj.env.set_var(target.member, current + value)
+			elif node.operator == "-=":
+				var current = obj.env.get_var(target.member)
+				obj.env.set_var(target.member, current - value)
+			elif node.operator == "*=":
+				var current = obj.env.get_var(target.member)
+				obj.env.set_var(target.member, current * value)
+			elif node.operator == "/=":
+				var current = obj.env.get_var(target.member)
+				if value == 0:
+					raise_error(EvalError.new(EvalError.RUNTIME_ERROR, "Division by zero"))
+					return null
+				obj.env.set_var(target.member, current / value)
+			
+			return value
+		
+		if typeof(obj) == TYPE_DICTIONARY:
+			obj[target.member] = value
+			return value
+		
+		raise_error(EvalError.new(EvalError.TYPE_ERROR, "Cannot set property on type %s" % type_string(typeof(obj))))
+		return null
 	
 	elif target is ASTIndexAccess:
 		var obj = eval(target.object)
@@ -514,6 +585,12 @@ func eval_for(node: ASTForStatement):
 	if had_error:
 		return null
 	
+	if typeof(iterable) == TYPE_STRING:
+		var chars = []
+		for i in range(iterable.length()):
+			chars.append(iterable[i])
+		iterable = chars
+	
 	if typeof(iterable) != TYPE_ARRAY:
 		raise_error(EvalError.new(EvalError.TYPE_ERROR, "for loop requires an iterable"))
 		return null
@@ -523,13 +600,11 @@ func eval_for(node: ASTForStatement):
 	should_continue = false
 	
 	for item in iterable:
-		# Create new scope for loop iteration
 		var new_env = EvalEnvironment.new(current_env)
 		new_env.define(node.variable, item, false)
 		var prev_env = current_env
 		current_env = new_env
 		
-		# Execute body without creating another scope (already in loop scope)
 		for statement in node.body:
 			result = eval(statement)
 			if had_error or should_break or should_continue or should_return:
@@ -607,14 +682,21 @@ func eval_member_access(node: ASTMemberAccess):
 	if had_error:
 		return null
 	
-	if typeof(obj) == TYPE_DICTIONARY:
-		if node.property in obj:
-			return obj[node.property]
+	if obj is StarchInstance:
+		if obj.env.has(node.member):
+			return obj.env.get_var(node.member)
 		else:
-			raise_error(EvalError.new(EvalError.KEY_ERROR, "Key '%s' not found in dictionary" % node.property))
+			raise_error(EvalError.new(EvalError.ATTRIBUTE_ERROR, "Instance of '%s' has no attribute '%s'" % [obj.name_class, node.member]))
+			return null
+	
+	if typeof(obj) == TYPE_DICTIONARY:
+		if node.member in obj:
+			return obj[node.member]
+		else:
+			raise_error(EvalError.new(EvalError.KEY_ERROR, "Key '%s' not found in dictionary" % node.member))
 			return null
 	else:
-		raise_error(EvalError.new(EvalError.ATTRIBUTE_ERROR, "Cannot access property '%s' on type %s" % [node.property, type_string(typeof(obj))]))
+		raise_error(EvalError.new(EvalError.ATTRIBUTE_ERROR, "Cannot access property '%s' on type %s" % [node.member, type_string(typeof(obj))]))
 		return null
 
 func eval_index_access(node: ASTIndexAccess):
@@ -750,7 +832,84 @@ func eval_try(node: ASTTryStatement):
 
 func eval_class_declaration(node: ASTClassDeclaration):
 	classes[node.name] = node
+	functions[node.name] = func(args):
+		return instantiate_class(node.name, args)
 	return null
+
+func instantiate_class(name_class: String, args: Array):
+	if not classes.has(name_class):
+		raise_error(EvalError.new(EvalError.NAME_ERROR, "class '%s' is not defined" % name_class))
+		return null
+	
+	var class_def = classes[name_class]
+	var instance = StarchInstance.new(name_class, class_def)
+	
+	var class_env = EvalEnvironment.new(current_env)
+	
+	for member in class_def.members:
+		if member is ASTVarDeclaration:
+			var value = eval(member.value) if member.value else null
+			class_env.define(member.name, value, member.is_const)
+	
+	for member in class_def.members:
+		if member is ASTFunctionDeclaration:
+			instance.methods[member.name] = member
+	
+	instance.env = class_env
+	
+	if instance.methods.has("_init"):
+		call_instance_method(instance, "_init", args)
+	
+	return instance
+
+func call_instance_method(instance: StarchInstance, method_name: String, args: Array):
+	if not instance.methods.has(method_name):
+		raise_error(EvalError.new(EvalError.ATTRIBUTE_ERROR, "Instance of '%s' has no method '%s'" % [instance.name_class, method_name]))
+		return null
+	
+	var method_def = instance.methods[method_name]
+	
+	var method_env = EvalEnvironment.new(instance.env)
+	
+	method_env.define("this", instance, true)
+	
+	for i in range(method_def.parameters.size()):
+		var param = method_def.parameters[i]
+		var value
+		
+		if i < args.size():
+			value = args[i]
+		elif param.default_value != null:
+			value = eval(param.default_value)
+		else:
+			raise_error(EvalError.new(EvalError.TYPE_ERROR, "Missing argument for parameter: %s" % param.name))
+			return null
+		
+		if param.param_type and param.param_type != "":
+			if not check_type(value, param.param_type):
+				return null
+		
+		method_env.define(param.name, value, false)
+	
+	var prev_env = current_env
+	current_env = method_env
+	should_return = false
+	return_value = null
+	
+	var result = null
+	for statement in method_def.body:
+		result = eval(statement)
+		if had_error or should_break or should_continue or should_return:
+			break
+	
+	current_env = prev_env
+	
+	if should_return:
+		result = return_value
+		should_return = false
+		return_value = null
+	
+	return result
 
 func eval_block(statements: Array):
 	var new_env = EvalEnvironment.new(current_env)
@@ -765,3 +924,16 @@ func eval_block(statements: Array):
 	
 	current_env = prev_env
 	return result
+
+class StarchInstance:
+	var name_class: String
+	var class_def: ASTClassDeclaration
+	var methods: Dictionary = {}
+	var env: EvalEnvironment
+	
+	func _init(name: String, def_node: ASTClassDeclaration):
+		name_class = name
+		class_def = def_node
+	
+	func _to_string() -> String:
+		return "<instance of %s>" % name_class

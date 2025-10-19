@@ -92,7 +92,7 @@ func parse_statement() -> ASTNode:
 func parse_var_declaration() -> ASTNode:
 	var pos = current_token.get_position()
 	var is_const = current_token.value == "const"
-	advance()  # consume 'var' or 'const'
+	advance()
 	
 	if not current_token or current_token.type != "Identifier":
 		log_text("error", "Expected identifier after '%s'" % ("const" if is_const else "var"))
@@ -103,7 +103,7 @@ func parse_var_declaration() -> ASTNode:
 	
 	var type_hint = ""
 	if current_token and current_token.type == "Colon":
-		advance()  # consume ':'
+		advance()
 		if not current_token or current_token.type != "Identifier":
 			log_text("error", "Expected type name after ':'")
 			return null
@@ -113,7 +113,7 @@ func parse_var_declaration() -> ASTNode:
 	if not current_token or current_token.type != "Assign":
 		log_text("error", "Expected '=' in variable declaration")
 		return null
-	advance()  # consume '='
+	advance()
 	
 	var value = parse_expression()
 	if not value:
@@ -122,7 +122,7 @@ func parse_var_declaration() -> ASTNode:
 	if not current_token or current_token.type != "Semicolon":
 		log_text("error", "Expected ';' after variable declaration")
 		return null
-	advance()  # consume ';'
+	advance()
 	
 	return ASTVarDeclaration.new(name, is_const, value, type_hint, pos)
 
@@ -134,7 +134,7 @@ func parse_expression_statement() -> ASTNode:
 	if not current_token or current_token.type != "Semicolon":
 		log_text("error", "Expected ';' after expression")
 		return null
-	advance()  # consume ';'
+	advance()
 	
 	return ASTExpressionStatement.new(expr, expr.position)
 
@@ -142,7 +142,7 @@ func parse_block() -> Array:
 	if not current_token or current_token.type != "LBrace":
 		log_text("error", "Expected '{' to start block")
 		return []
-	advance()  # consume '{'
+	advance()
 	
 	var statements: Array = []
 	
@@ -155,27 +155,17 @@ func parse_block() -> Array:
 	if not current_token or current_token.type != "RBrace":
 		log_text("error", "Expected '}' to close block")
 		return []
-	advance()  # consume '}'
+	advance()
 	
 	return statements
 
 func parse_if_statement() -> ASTNode:
 	var pos = current_token.get_position()
-	advance()  # consume 'if'
-	
-	if not current_token or current_token.type != "LParen":
-		log_text("error", "Expected '(' after 'if'")
-		return null
-	advance()  # consume '('
+	advance()
 	
 	var condition = parse_expression()
 	if not condition:
 		return null
-	
-	if not current_token or current_token.type != "RParen":
-		log_text("error", "Expected ')' after if condition")
-		return null
-	advance()  # consume ')'
 	
 	var then_block = parse_block()
 	if then_block.is_empty() and _error:
@@ -184,23 +174,12 @@ func parse_if_statement() -> ASTNode:
 	var elif_branches: Array = []
 	var else_block: Array = []
 	
-	# Handle elif branches
 	while current_token and current_token.type == "Keyword" and current_token.value == "elif":
-		advance()  # consume 'elif'
-		
-		if not current_token or current_token.type != "LParen":
-			log_text("error", "Expected '(' after 'elif'")
-			return null
-		advance()  # consume '('
+		advance()
 		
 		var elif_condition = parse_expression()
 		if not elif_condition:
 			return null
-		
-		if not current_token or current_token.type != "RParen":
-			log_text("error", "Expected ')' after elif condition")
-			return null
-		advance()  # consume ')'
 		
 		var elif_block = parse_block()
 		if elif_block.is_empty() and _error:
@@ -208,9 +187,8 @@ func parse_if_statement() -> ASTNode:
 		
 		elif_branches.append(ASTElifBranch.new(elif_condition, elif_block, elif_condition.position))
 	
-	# Handle else branch
 	if current_token and current_token.type == "Keyword" and current_token.value == "else":
-		advance()  # consume 'else'
+		advance()
 		else_block = parse_block()
 		if else_block.is_empty() and _error:
 			return null
@@ -219,12 +197,7 @@ func parse_if_statement() -> ASTNode:
 
 func parse_for_statement() -> ASTNode:
 	var pos = current_token.get_position()
-	advance()  # consume 'for'
-	
-	if not current_token or current_token.type != "LParen":
-		log_text("error", "Expected '(' after 'for'")
-		return null
-	advance()  # consume '('
+	advance()
 	
 	if not current_token or current_token.type != "Identifier":
 		log_text("error", "Expected iterator variable name")
@@ -236,16 +209,11 @@ func parse_for_statement() -> ASTNode:
 	if not current_token or current_token.type != "Keyword" or current_token.value != "in":
 		log_text("error", "Expected 'in' after iterator variable")
 		return null
-	advance()  # consume 'in'
+	advance()
 	
 	var iterable = parse_expression()
 	if not iterable:
 		return null
-	
-	if not current_token or current_token.type != "RParen":
-		log_text("error", "Expected ')' after for iterator")
-		return null
-	advance()  # consume ')'
 	
 	var body = parse_block()
 	if body.is_empty() and _error:
@@ -255,21 +223,11 @@ func parse_for_statement() -> ASTNode:
 
 func parse_while_statement() -> ASTNode:
 	var pos = current_token.get_position()
-	advance()  # consume 'while'
-	
-	if not current_token or current_token.type != "LParen":
-		log_text("error", "Expected '(' after 'while'")
-		return null
-	advance()  # consume '('
+	advance()
 	
 	var condition = parse_expression()
 	if not condition:
 		return null
-	
-	if not current_token or current_token.type != "RParen":
-		log_text("error", "Expected ')' after while condition")
-		return null
-	advance()  # consume ')'
 	
 	var body = parse_block()
 	if body.is_empty() and _error:
@@ -279,11 +237,10 @@ func parse_while_statement() -> ASTNode:
 
 func parse_return_statement() -> ASTNode:
 	var pos = current_token.get_position()
-	advance()  # consume 'return'
+	advance()
 	
 	var value: ASTNode = null
 	
-	# Check if there's a return value
 	if current_token and current_token.type != "Semicolon":
 		value = parse_expression()
 		if not value:
@@ -292,35 +249,35 @@ func parse_return_statement() -> ASTNode:
 	if not current_token or current_token.type != "Semicolon":
 		log_text("error", "Expected ';' after return statement")
 		return null
-	advance()  # consume ';'
+	advance()
 	
 	return ASTReturnStatement.new(value, pos)
 
 func parse_break_statement() -> ASTNode:
 	var pos = current_token.get_position()
-	advance()  # consume 'break'
+	advance()
 	
 	if not current_token or current_token.type != "Semicolon":
 		log_text("error", "Expected ';' after 'break'")
 		return null
-	advance()  # consume ';'
+	advance()
 	
 	return ASTBreakStatement.new(pos)
 
 func parse_continue_statement() -> ASTNode:
 	var pos = current_token.get_position()
-	advance()  # consume 'continue'
+	advance()
 	
 	if not current_token or current_token.type != "Semicolon":
 		log_text("error", "Expected ';' after 'continue'")
 		return null
-	advance()  # consume ';'
+	advance()
 	
 	return ASTContinueStatement.new(pos)
 
 func parse_function_declaration() -> ASTNode:
 	var pos = current_token.get_position()
-	advance()  # consume 'function'
+	advance()
 	
 	if not current_token or current_token.type != "Identifier":
 		log_text("error", "Expected function name")
@@ -332,11 +289,10 @@ func parse_function_declaration() -> ASTNode:
 	if not current_token or current_token.type != "LParen":
 		log_text("error", "Expected '(' after function name")
 		return null
-	advance()  # consume '('
+	advance()
 	
 	var parameters: Array = []
 	
-	# Parse parameters
 	while current_token and current_token.type != "RParen":
 		if not current_token or current_token.type != "Identifier":
 			log_text("error", "Expected parameter name")
@@ -348,18 +304,16 @@ func parse_function_declaration() -> ASTNode:
 		var param_type = ""
 		var default_value: ASTNode = null
 		
-		# Optional type hint
 		if current_token and current_token.type == "Colon":
-			advance()  # consume ':'
+			advance()
 			if not current_token or current_token.type != "Identifier":
 				log_text("error", "Expected type name after ':'")
 				return null
 			param_type = current_token.value
 			advance()
 		
-		# Optional default value (using 'or' keyword only)
 		if current_token and current_token.type == "Keyword" and current_token.value == "or":
-			advance()  # consume 'or'
+			advance()
 			default_value = parse_expression()
 			if not default_value:
 				return null
@@ -367,7 +321,7 @@ func parse_function_declaration() -> ASTNode:
 		parameters.append(ASTParameter.new(param_name, param_type, default_value, pos))
 		
 		if current_token and current_token.type == "Comma":
-			advance()  # consume ','
+			advance()
 		elif current_token and current_token.type != "RParen":
 			log_text("error", "Expected ',' or ')' in parameter list")
 			return null
@@ -375,11 +329,11 @@ func parse_function_declaration() -> ASTNode:
 	if not current_token or current_token.type != "RParen":
 		log_text("error", "Expected ')' after parameters")
 		return null
-	advance()  # consume ')'
+	advance()
 	
 	var return_type = ""
 	if current_token and current_token.type == "Arrow":
-		advance()  # consume '->'
+		advance()
 		if not current_token or current_token.type not in ["Identifier", "Keyword"]:
 			log_text("error", "Expected return type after '->'")
 			return null
@@ -394,7 +348,7 @@ func parse_function_declaration() -> ASTNode:
 
 func parse_class_declaration() -> ASTNode:
 	var pos = current_token.get_position()
-	advance()  # consume 'class'
+	advance()
 	
 	if not current_token or current_token.type != "Identifier":
 		log_text("error", "Expected class name")
@@ -405,9 +359,8 @@ func parse_class_declaration() -> ASTNode:
 	
 	var parent = ""
 	
-	# Check for inheritance
 	if current_token and current_token.type == "Colon":
-		advance()  # consume ':'
+		advance()
 		if not current_token or current_token.type != "Identifier":
 			log_text("error", "Expected parent class name after ':'")
 			return null
@@ -417,7 +370,7 @@ func parse_class_declaration() -> ASTNode:
 	if not current_token or current_token.type != "LBrace":
 		log_text("error", "Expected '{' after class name")
 		return null
-	advance()  # consume '{'
+	advance()
 	
 	var members: Array = []
 	
@@ -439,13 +392,13 @@ func parse_class_declaration() -> ASTNode:
 	if not current_token or current_token.type != "RBrace":
 		log_text("error", "Expected '}' to close class body")
 		return null
-	advance()  # consume '}'
+	advance()
 	
 	return ASTClassDeclaration.new(name_class, parent, members, pos)
 
 func parse_try_statement() -> ASTNode:
 	var pos = current_token.get_position()
-	advance()  # consume 'try'
+	advance()
 	
 	var try_block = parse_block()
 	if try_block.is_empty() and _error:
@@ -454,12 +407,12 @@ func parse_try_statement() -> ASTNode:
 	if not current_token or current_token.type != "Keyword" or current_token.value != "catch":
 		log_text("error", "Expected 'catch' after try block")
 		return null
-	advance()  # consume 'catch'
+	advance()
 	
 	if not current_token or current_token.type != "LParen":
 		log_text("error", "Expected '(' after 'catch'")
 		return null
-	advance()  # consume '('
+	advance()
 	
 	if not current_token or current_token.type != "Identifier":
 		log_text("error", "Expected exception variable name")
@@ -471,7 +424,7 @@ func parse_try_statement() -> ASTNode:
 	if not current_token or current_token.type != "RParen":
 		log_text("error", "Expected ')' after exception variable")
 		return null
-	advance()  # consume ')'
+	advance()
 	
 	var catch_block = parse_block()
 	if catch_block.is_empty() and _error:
@@ -481,7 +434,7 @@ func parse_try_statement() -> ASTNode:
 
 func parse_raise_statement() -> ASTNode:
 	var pos = current_token.get_position()
-	advance()  # consume 'raise'
+	advance()
 	
 	var exception = parse_expression()
 	if not exception:
@@ -490,13 +443,13 @@ func parse_raise_statement() -> ASTNode:
 	if not current_token or current_token.type != "Semicolon":
 		log_text("error", "Expected ';' after raise statement")
 		return null
-	advance()  # consume ';'
+	advance()
 	
 	return ASTRaiseStatement.new(exception, pos)
 
 func parse_using_statement() -> ASTNode:
 	var pos = current_token.get_position()
-	advance()  # consume 'using'
+	advance()
 	
 	if not current_token or current_token.type != "Identifier":
 		log_text("error", "Expected module or item name after 'using'")
@@ -505,10 +458,8 @@ func parse_using_statement() -> ASTNode:
 	var first_name = current_token.value
 	advance()
 	
-	# Check if it's "using foo from bar;" or just "using foo;"
 	if current_token and current_token.type == "Keyword" and current_token.value == "from":
-		# using foo from bar;
-		advance()  # consume 'from'
+		advance()
 		
 		if not current_token or current_token.type != "Identifier":
 			log_text("error", "Expected module name after 'from'")
@@ -520,15 +471,14 @@ func parse_using_statement() -> ASTNode:
 		if not current_token or current_token.type != "Semicolon":
 			log_text("error", "Expected ';' after using statement")
 			return null
-		advance()  # consume ';'
+		advance()
 		
 		return ASTUsingFromStatement.new(module_name, [first_name], pos)
 	else:
-		# using foo;
 		if not current_token or current_token.type != "Semicolon":
 			log_text("error", "Expected ';' after using statement")
 			return null
-		advance()  # consume ';'
+		advance()
 		
 		return ASTUsingStatement.new(first_name, pos)
 
@@ -545,17 +495,14 @@ func parse_primary() -> ASTNode:
 			var old: Token = current_token
 			advance()
 			return ASTLiteral.new("int", int(old.value), old.get_position())
-		
 		"Float":
 			var old: Token = current_token
 			advance()
 			return ASTLiteral.new("float", float(old.value), old.get_position())
-		
 		"String":
 			var old: Token = current_token
 			advance()
 			return ASTLiteral.new("str", old.value, old.get_position())
-		
 		"Keyword":
 			var old: Token = current_token
 			if old.value in ["true", "false"]:
@@ -567,12 +514,10 @@ func parse_primary() -> ASTNode:
 			else:
 				log_text("error", "Unexpected keyword '%s' in expression at line %s, column %s" % old.get_data())
 				return null
-		
 		"Identifier":
 			var old: Token = current_token
 			advance()
 			return ASTIdentifier.new(old.value, old.get_position())
-		
 		"LParen":
 			advance()
 			var expression: ASTNode = parse_expression()
@@ -583,119 +528,118 @@ func parse_primary() -> ASTNode:
 				return null
 			advance()
 			return expression
-		
 		"LBrack":
-			var pos: Vector2i = current_token.get_position()
-			advance()
-			
-			if current_token and current_token.type == "RBrack":
-				advance()
-				return ASTArrayLiteral.new([], pos)
-			
-			# Parse first expression
-			var first_expr = parse_expression()
-			if not first_expr:
-				return null
-			
-			if not current_token:
-				log_text("error", "Unexpected end of input")
-				return null
-			
-			# Check if it's a range [start..end] or [start..end..step]
-			if current_token.type == "Range":
-				advance()  # consume ".."
-				
-				var end_expr = parse_expression()
-				if not end_expr:
-					return null
-				
-				var step_expr = null
-				
-				# Check for step [start..end..step]
-				if current_token and current_token.type == "Range":
-					advance()  # consume second ".."
-					step_expr = parse_expression()
-					if not step_expr:
-						return null
-				
-				if not current_token or current_token.type != "RBrack":
-					log_text("error", "Expected ']' after range")
-					return null
-				advance()
-				
-				return ASTRangeLiteral.new(first_expr, end_expr, step_expr, pos)
-			
-			# Otherwise it's an array literal
-			var items: Array = [first_expr]
-			
-			while current_token:
-				if current_token.type == "RBrack":
-					advance()
-					return ASTArrayLiteral.new(items, pos)
-				elif current_token.type == "Comma":
-					advance()
-					if current_token and current_token.type == "RBrack":
-						advance()
-						return ASTArrayLiteral.new(items, pos)
-					
-					var expr = parse_expression()
-					if not expr:
-						return null
-					items.append(expr)
-				else:
-					log_text("error", "Expected ',' or ']' in array literal but got '%s' at line %s, column %s" % current_token.get_data())
-					return null
-			
-			log_text("error", "Unclosed array literal")
-			return null
-		
+			return parse_array_or_range()
 		"LBrace":
-			var pos: Vector2i = current_token.get_position()
-			advance()
-			var items: Array = []
-			
-			if current_token and current_token.type == "RBrace":
-				advance()
-				return ASTDictLiteral.new(items, pos)
-			
-			while current_token:
-				var key = parse_expression()
-				if not key:
-					return null
-				
-				if not current_token or current_token.type != "Colon":
-					log_text("error", "Expected ':' after dictionary key but got '%s'" % (current_token.value if current_token else "EOF"))
-					return null
-				advance()
-				
-				var value = parse_expression()
-				if not value:
-					return null
-				
-				items.append({"key": key, "value": value})
-				
-				if not current_token:
-					log_text("error", "Unexpected end of input in dictionary literal")
-					return null
-				
-				if current_token.type == "RBrace":
-					advance()
-					return ASTDictLiteral.new(items, pos)
-				elif current_token.type == "Comma":
-					advance()
-					if current_token and current_token.type == "RBrace":
-						advance()
-						return ASTDictLiteral.new(items, pos)
-				else:
-					log_text("error", "Expected ',' or '}' in dictionary literal but got '%s' at line %s, column %s" % current_token.get_data())
-					return null
-			
-			log_text("error", "Unclosed dictionary literal")
-			return null
-		
+			return parse_dict_literal()
 		_:
 			log_text("error", "Unexpected token '%s' at line %s, column %s" % current_token.get_data())
 			return null
+
+func parse_array_or_range() -> ASTNode:
+	var pos: Vector2i = current_token.get_position()
+	advance()
+	
+	if current_token and current_token.type == "RBrack":
+		advance()
+		return ASTArrayLiteral.new([], pos)
+	
+	var first_expr = parse_expression()
+	if not first_expr:
+		return null
+	
+	if not current_token:
+		log_text("error", "Unexpected end of input")
+		return null
+	
+	if current_token.type == "Range":
+		advance()
+		
+		var end_expr = parse_expression()
+		if not end_expr:
+			return null
+		
+		var step_expr = null
+		
+		if current_token and current_token.type == "Range":
+			advance()
+			step_expr = parse_expression()
+			if not step_expr:
+				return null
+		
+		if not current_token or current_token.type != "RBrack":
+			log_text("error", "Expected ']' after range")
+			return null
+		advance()
+		
+		return ASTRangeLiteral.new(first_expr, end_expr, step_expr, pos)
+	
+	var items: Array = [first_expr]
+	
+	while current_token:
+		if current_token.type == "RBrack":
+			advance()
+			return ASTArrayLiteral.new(items, pos)
+		elif current_token.type == "Comma":
+			advance()
+			if current_token and current_token.type == "RBrack":
+				advance()
+				return ASTArrayLiteral.new(items, pos)
+			
+			var expr = parse_expression()
+			if not expr:
+				return null
+			items.append(expr)
+		else:
+			log_text("error", "Expected ',' or ']' in array literal but got '%s' at line %s, column %s" % current_token.get_data())
+			return null
+	
+	log_text("error", "Unclosed array literal")
+	return null
+
+func parse_dict_literal() -> ASTNode:
+	var pos: Vector2i = current_token.get_position()
+	advance()
+	var items: Array = []
+	
+	if current_token and current_token.type == "RBrace":
+		advance()
+		return ASTDictLiteral.new(items, pos)
+	
+	while current_token:
+		var key = parse_expression()
+		if not key:
+			return null
+		
+		if not current_token or current_token.type != "Colon":
+			log_text("error", "Expected ':' after dictionary key but got '%s'" % (current_token.value if current_token else "EOF"))
+			return null
+		advance()
+		
+		var value = parse_expression()
+		if not value:
+			return null
+		
+		items.append({"key": key, "value": value})
+		
+		if not current_token:
+			log_text("error", "Unexpected end of input in dictionary literal")
+			return null
+		
+		if current_token.type == "RBrace":
+			advance()
+			return ASTDictLiteral.new(items, pos)
+		elif current_token.type == "Comma":
+			advance()
+			if current_token and current_token.type == "RBrace":
+				advance()
+				return ASTDictLiteral.new(items, pos)
+		else:
+			log_text("error", "Expected ',' or '}' in dictionary literal but got '%s' at line %s, column %s" % current_token.get_data())
+			return null
+	
+	log_text("error", "Unclosed dictionary literal")
+	return null
 
 func parse_call() -> ASTNode:
 	var expr = parse_primary()
@@ -708,17 +652,14 @@ func parse_call() -> ASTNode:
 				expr = parse_function_call(expr)
 				if not expr:
 					return null
-			
 			"Dot":
 				expr = parse_member_access(expr)
 				if not expr:
 					return null
-			
 			"LBrack":
 				expr = parse_index_or_slice(expr)
 				if not expr:
 					return null
-			
 			_:
 				break
 	
@@ -726,7 +667,7 @@ func parse_call() -> ASTNode:
 
 func parse_member_access(object: ASTNode) -> ASTNode:
 	var pos = current_token.get_position()
-	advance()  # consume '.'
+	advance()
 	
 	if not current_token or current_token.type != "Identifier":
 		log_text("error", "Expected property name after '.' at line %s, column %s" % [pos.x, pos.y])
@@ -739,7 +680,7 @@ func parse_member_access(object: ASTNode) -> ASTNode:
 
 func parse_index_or_slice(object: ASTNode) -> ASTNode:
 	var pos = current_token.get_position()
-	advance()  # consume '['
+	advance()
 	
 	if not current_token:
 		log_text("error", "Unexpected end of input, expected expression or ']'")
@@ -766,7 +707,7 @@ func parse_index_or_slice(object: ASTNode) -> ASTNode:
 		return null
 
 func parse_slice(object: ASTNode, start: ASTNode, pos: Vector2i) -> ASTNode:
-	advance()  # consume first ':'
+	advance()
 	
 	var end: ASTNode = null
 	var step: ASTNode = null
@@ -785,7 +726,7 @@ func parse_slice(object: ASTNode, start: ASTNode, pos: Vector2i) -> ASTNode:
 		return null
 	
 	if current_token.type == "Colon":
-		advance()  # consume second ':'
+		advance()
 		
 		if not current_token:
 			log_text("error", "Unexpected end of input in slice")
@@ -800,13 +741,13 @@ func parse_slice(object: ASTNode, start: ASTNode, pos: Vector2i) -> ASTNode:
 		log_text("error", "Expected ']' to close slice at line %s, column %s" % [pos.x, pos.y])
 		return null
 	
-	advance()  # consume ']'
+	advance()
 	
 	return ASTSliceAccess.new(object, start, end, step, pos)
 
 func parse_function_call(function: ASTNode) -> ASTNode:
 	var pos = current_token.get_position()
-	advance()  # consume '('
+	advance()
 	
 	var arguments: Array = []
 	
@@ -842,7 +783,7 @@ func parse_function_call(function: ASTNode) -> ASTNode:
 		log_text("error", "Expected ')' to close function call")
 		return null
 	
-	advance()  # consume ')'
+	advance()
 	
 	return ASTFunctionCall.new(function, arguments, pos)
 
@@ -991,11 +932,10 @@ func parse_pipeline() -> ASTNode:
 		return null
 	
 	while current_token and current_token.type == "Pipeline":
-		advance()  # consume '~>'
+		advance()
 		
-		# Check if it starts with a dot (member access syntax)
 		if current_token and current_token.type == "Dot":
-			advance()  # consume '.'
+			advance()
 			
 			if not current_token or current_token.type != "Identifier":
 				log_text("error", "Expected method name after '.' in pipeline")
@@ -1005,20 +945,15 @@ func parse_pipeline() -> ASTNode:
 			var pos = current_token.get_position()
 			advance()
 			
-			# Must be followed by function call
 			if not current_token or current_token.type != "LParen":
 				log_text("error", "Expected '()' after method name in pipeline")
 				return null
 			
-			# Create member access
 			var member = ASTMemberAccess.new(left, method_name, pos)
-			
-			# Parse the function call on the member access
 			left = parse_function_call(member)
 			if not left:
 				return null
 		else:
-			# Regular function call - inject left as first argument
 			var right = parse_or()
 			if not right:
 				return null
@@ -1039,7 +974,7 @@ func parse_ternary() -> ASTNode:
 	
 	if current_token and current_token.type == "Keyword" and current_token.value == "if":
 		var start: Token = current_token
-		advance()  # consume 'if'
+		advance()
 		
 		var condition = parse_pipeline()
 		if not condition:
@@ -1048,7 +983,7 @@ func parse_ternary() -> ASTNode:
 		if not current_token or current_token.type != "Keyword" or current_token.value != "else":
 			log_text("error", "Expected 'else' in ternary expression")
 			return null
-		advance()  # consume 'else'
+		advance()
 		
 		var false_value = parse_pipeline()
 		if not false_value:
