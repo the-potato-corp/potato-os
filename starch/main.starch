@@ -1,1 +1,5 @@
-for i in [1..100] {}
+using math;
+using gdmath;
+
+print(math.add(1, 1));
+print(gdmath.add(1, 1));

@@ -307,6 +307,9 @@ func check_type(value, type_hint: String) -> bool:
 						raise_error(EvalError.new(EvalError.TYPE_ERROR, "Type mismatch: expected %s, got %s" % [type_hint, value.name_class]))
 						return false
 					return true
+				elif value is GDScriptInstanceWrapper:
+					# Assuming the type check passed if it's a GDScript wrapper instance matching the import name.
+					return true 
 				else:
 					raise_error(EvalError.new(EvalError.TYPE_ERROR, "Type mismatch: expected %s, got %s" % [type_hint, type_string(typeof(value))]))
 					return false
@@ -327,6 +330,12 @@ func type_string(type_id: int) -> String:
 func eval_function_call(node: ASTFunctionCall):
 	var callee = node.callee
 	
+	var args = []
+	for arg in node.arguments:
+		args.append(eval(arg))
+		if had_error:
+			return null
+	
 	if callee is ASTIdentifier:
 		var func_name: String = callee.name
 		
@@ -335,12 +344,6 @@ func eval_function_call(node: ASTFunctionCall):
 			return null
 		
 		var func_def = functions[func_name]
-		
-		var args = []
-		for arg in node.arguments:
-			args.append(eval(arg))
-			if had_error:
-				return null
 		
 		if func_def is Callable:
 			return func_def.call(args)
@@ -352,13 +355,6 @@ func eval_function_call(node: ASTFunctionCall):
 		var func_or_obj = eval(callee)
 		if had_error:
 			return null
-		
-		# Evaluate arguments
-		var args = []
-		for arg in node.arguments:
-			args.append(eval(arg))
-			if had_error:
-				return null
 		
 		# If it's a callable (function from module or builtin), just call it
 		if func_or_obj is Callable:
@@ -379,6 +375,26 @@ func eval_function_call(node: ASTFunctionCall):
 			return call_instance_method(obj, method_name, args)
 		
 		return call_method(obj, method_name, args)
+	
+	elif callee is ASTMemberAccess:
+		# 1. Evaluate the member access itself (might be a bound method, a property, or a class constructor)
+		var member_result = eval(callee)
+		if had_error:
+			return null
+		
+		# 2. Handle the result of the member access
+		
+		# Case A: If it's a bound method (from Starch or GDScript wrapper) or native Callable
+		if member_result is Callable:
+			return member_result.call(args)
+		
+		# Case B: If it's a user function definition (e.g., from a module)
+		if member_result is ASTFunctionDeclaration:
+			return call_user_function(member_result, args, node)
+			
+		# PATCH START: Handle bound Starch methods returned by eval_member_access
+		if member_result is StarchBoundMethod:
+			return call_instance_method(member_result.instance, member_result.method_name, args)
 	
 	else:
 		raise_error(EvalError.new(EvalError.TYPE_ERROR, "Cannot call non-identifier or non-member"))
@@ -475,23 +491,18 @@ func eval_assignment(node: ASTAssignment):
 			raise_error(EvalError.new(EvalError.TYPE_ERROR, "cannot reassign constant '%s'" % target_name))
 			return null
 		
-		if node.operator == "=":
-			current_env.set_var(target_name, value)
-		elif node.operator == "+=":
-			var current = current_env.get_var(target_name)
-			current_env.set_var(target_name, current + value)
-		elif node.operator == "-=":
-			var current = current_env.get_var(target_name)
-			current_env.set_var(target_name, current - value)
-		elif node.operator == "*=":
-			var current = current_env.get_var(target_name)
-			current_env.set_var(target_name, current * value)
-		elif node.operator == "/=":
-			var current = current_env.get_var(target_name)
-			if value == 0:
-				raise_error(EvalError.new(EvalError.RUNTIME_ERROR, "Division by zero"))
-				return null
-			current_env.set_var(target_name, current / value)
+		var current = current_env.get_var(target_name)
+		
+		match node.operator:
+			"=": current_env.set_var(target_name, value)
+			"+=": current_env.set_var(target_name, current + value)
+			"-=": current_env.set_var(target_name, current - value)
+			"*=": current_env.set_var(target_name, current * value)
+			"/=":
+				if value == 0:
+					raise_error(EvalError.new(EvalError.RUNTIME_ERROR, "Division by zero"))
+					return null
+				current_env.set_var(target_name, current / value)
 		
 		return value
 	
@@ -500,37 +511,58 @@ func eval_assignment(node: ASTAssignment):
 		if had_error:
 			return null
 		
+		var member_name = target.member
+		
 		if obj is StarchInstance:
-			if not obj.env.has(target.member):
-				raise_error(EvalError.new(EvalError.ATTRIBUTE_ERROR, "Instance of '%s' has no attribute '%s'" % [obj.name_class, target.member]))
+			if not obj.env.has(member_name):
+				raise_error(EvalError.new(EvalError.ATTRIBUTE_ERROR, "Instance of '%s' has no attribute '%s'" % [obj.name_class, member_name]))
 				return null
 			
-			if not obj.env.can_set(target.member):
-				raise_error(EvalError.new(EvalError.TYPE_ERROR, "cannot reassign constant '%s'" % target.member))
+			if not obj.env.can_set(member_name):
+				raise_error(EvalError.new(EvalError.TYPE_ERROR, "cannot reassign constant '%s'" % member_name))
 				return null
 			
-			if node.operator == "=":
-				obj.env.set_var(target.member, value)
-			elif node.operator == "+=":
-				var current = obj.env.get_var(target.member)
-				obj.env.set_var(target.member, current + value)
-			elif node.operator == "-=":
-				var current = obj.env.get_var(target.member)
-				obj.env.set_var(target.member, current - value)
-			elif node.operator == "*=":
-				var current = obj.env.get_var(target.member)
-				obj.env.set_var(target.member, current * value)
-			elif node.operator == "/=":
-				var current = obj.env.get_var(target.member)
-				if value == 0:
-					raise_error(EvalError.new(EvalError.RUNTIME_ERROR, "Division by zero"))
-					return null
-				obj.env.set_var(target.member, current / value)
+			var current = obj.env.get_var(member_name)
+
+			match node.operator:
+				"=": obj.env.set_var(member_name, value)
+				"+=": obj.env.set_var(member_name, current + value)
+				"-=": obj.env.set_var(member_name, current - value)
+				"*=": obj.env.set_var(member_name, current * value)
+				"/=":
+					if value == 0:
+						raise_error(EvalError.new(EvalError.RUNTIME_ERROR, "Division by zero"))
+						return null
+					obj.env.set_var(member_name, current / value)
 			
 			return value
 		
+		# PATCH START: Handle assignment to GDScriptInstanceWrapper properties
+		elif obj is GDScriptInstanceWrapper:
+			var gd_instance = obj.gd_instance
+			
+			if node.operator == "=":
+				gd_instance.set(member_name, value)
+			else:
+				if not gd_instance.has_method("get") and not gd_instance.has(member_name):
+					raise_error(EvalError.new(EvalError.ATTRIBUTE_ERROR, "GDScript instance has no attribute '%s'" % member_name))
+					return null
+				
+				var current = gd_instance.get(member_name)
+				match node.operator:
+					"+=": gd_instance.set(member_name, current + value)
+					"-=": gd_instance.set(member_name, current - value)
+					"*=": gd_instance.set(member_name, current * value)
+					"/=": 
+						if value == 0:
+							raise_error(EvalError.new(EvalError.RUNTIME_ERROR, "Division by zero"))
+							return null
+						gd_instance.set(member_name, current / value)
+			return value
+		# PATCH END
+		
 		if typeof(obj) == TYPE_DICTIONARY:
-			obj[target.member] = value
+			obj[member_name] = value
 			return value
 		
 		raise_error(EvalError.new(EvalError.TYPE_ERROR, "Cannot set property on type %s" % type_string(typeof(obj))))
@@ -774,38 +806,77 @@ func eval_member_access(node: ASTMemberAccess):
 	if had_error:
 		return null
 	
+	var member_name = node.member
+	
 	# Handle module member access
 	if obj is ModuleProxy:
-		var member_name = node.member
-		
 		if obj.module_data.functions.has(member_name):
 			return obj.module_data.functions[member_name]
 		elif obj.module_data.classes.has(member_name):
-			var name_class = member_name
-			var class_def = obj.module_data.classes[name_class]
-			# Return class constructor
-			return func(args):
-				return instantiate_class_from_module(obj.module_data, name_class, args)
+			var class_def = obj.module_data.classes[member_name]
+			
+			# PATCH: Delegate class constructor based on type (Starch or GDScript)
+			if class_def is GDScript:
+				return func(args):
+					return instantiate_gdscript_class(class_def, args)
+			elif class_def is ASTClassDeclaration:
+				return func(args):
+					return instantiate_class_from_module(obj.module_data, member_name, args)
+			# END PATCH
 		else:
 			raise_error(EvalError.new(EvalError.ATTRIBUTE_ERROR, "Module '%s' has no attribute '%s'" % [obj.name, member_name]))
 			return null
 	
-	# Normal instance member access
+	# PATCH START: Handle GDScript instance member access
+	if obj is GDScriptInstanceWrapper:
+		var gd_instance = obj.gd_instance
+		
+		# 1. Check for methods
+		if gd_instance.has_method(member_name):
+			# Return a callable that binds the instance to the method
+			return func(args):
+				var result = gd_instance.callv(member_name, args)
+				return result
+		
+		# 2. Check for properties (using .get() for dynamic properties)
+		var value = gd_instance.get(member_name)
+		
+		# Check if we successfully accessed an existing property/variable
+		if value != null || gd_instance.get_property_list().any(func(prop): return prop.name == member_name) || member_name in gd_instance:
+			return value
+		
+		# 3. Fallback for built-in methods on internal types
+		var method_result = call_method(gd_instance, member_name, [])
+		if not had_error:
+			return method_result
+		
+		if had_error: return null 
+	# PATCH END
+	
+	# Normal Starch instance member access
 	if obj is StarchInstance:
-		if obj.env.has(node.property):
-			return obj.env.get_var(node.property)
+		if obj.env.has(member_name):
+			return obj.env.get_var(member_name)
+		elif obj.methods.has(member_name):
+			# Return a bound method proxy
+			return StarchBoundMethod.new(obj, member_name)
 		else:
-			raise_error(EvalError.new(EvalError.ATTRIBUTE_ERROR, "Instance of '%s' has no attribute '%s'" % [obj.name_class, node.property]))
+			raise_error(EvalError.new(EvalError.ATTRIBUTE_ERROR, "Instance of '%s' has no attribute '%s'" % [obj.name_class, member_name]))
 			return null
 	
 	if typeof(obj) == TYPE_DICTIONARY:
-		if node.property in obj:
-			return obj[node.property]
+		if member_name in obj:
+			return obj[member_name]
 		else:
-			raise_error(EvalError.new(EvalError.KEY_ERROR, "Key '%s' not found in dictionary" % node.property))
+			raise_error(EvalError.new(EvalError.KEY_ERROR, "Key '%s' not found in dictionary" % member_name))
 			return null
 	else:
-		raise_error(EvalError.new(EvalError.ATTRIBUTE_ERROR, "Cannot access property '%s' on type %s" % [node.property, type_string(typeof(obj))]))
+		# Fallback for built-in methods on native types
+		var method_result = call_method(obj, member_name, [])
+		if had_error:
+			return null
+		
+		raise_error(EvalError.new(EvalError.ATTRIBUTE_ERROR, "Cannot access property '%s' on type %s" % [member_name, type_string(typeof(obj))]))
 		return null
 
 func eval_index_access(node: ASTIndexAccess):
@@ -951,6 +1022,12 @@ func instantiate_class(name_class: String, args: Array):
 		return null
 	
 	var class_def = classes[name_class]
+
+	# PATCH START: Delegate to GDScript instantiation if class_def is a GDScript resource
+	if class_def is GDScript:
+		return instantiate_gdscript_class(class_def, args)
+	# PATCH END
+	
 	var instance = StarchInstance.new(name_class, class_def)
 	
 	var class_env = EvalEnvironment.new(current_env)
@@ -963,17 +1040,23 @@ func instantiate_class(name_class: String, args: Array):
 		
 		var parent_def = classes[class_def.parent]
 		
-		# Inherit parent variables
-		for member in parent_def.members:
-			if member is ASTVarDeclaration:
-				var value = eval(member.value) if member.value else null
-				class_env.define(member.name, value, member.is_const)
-		
-		# Inherit parent methods
-		for member in parent_def.members:
-			if member is ASTFunctionDeclaration:
-				instance.methods[member.name] = member
-	
+		# Handle parent inheritance (assuming parent is Starch, otherwise type check needed here too)
+		if parent_def is ASTClassDeclaration:
+			# Inherit parent variables
+			for member in parent_def.members:
+				if member is ASTVarDeclaration:
+					var value = eval(member.value) if member.value else null
+					class_env.define(member.name, value, member.is_const)
+			
+			# Inherit parent methods
+			for member in parent_def.members:
+				if member is ASTFunctionDeclaration:
+					instance.methods[member.name] = member
+		else:
+			raise_error(EvalError.new(EvalError.TYPE_ERROR, "Cannot inherit from non-Starch class '%s'" % class_def.parent))
+			return null
+
+
 	# Then add/override with current class members
 	for member in class_def.members:
 		if member is ASTVarDeclaration:
@@ -1102,119 +1185,49 @@ func eval_using_from(node: ASTUsingFromStatement):
 	
 	return null
 
-func resolve_module_path(module_name: String) -> String:
-	# If current_file_path is empty, assume we're in the project root
-	var base_dir = ""
-	if current_file_path != "":
-		base_dir = current_file_path.get_base_dir()
-	
-	var lib = "user://potatofs/system/lib"
-	var bin = "user://potatofs/system/bin"
-	
-	var potential_paths = [
-		base_dir.path_join(module_name),
-		"res://" + module_name,
-		lib.path_join(module_name),
-		bin.path_join(module_name)
-	]
-	
-	for path in potential_paths:
-		if FileAccess.file_exists(path):
-			return path
-		elif FileAccess.file_exists(path + ".starch"):
-			return path
-	
-	return ""
-
-func load_module(module_path: String) -> bool:
-	var file = FileAccess.open(module_path, FileAccess.READ)
-	if not file:
-		raise_error(EvalError.new(EvalError.RUNTIME_ERROR, "Failed to open module file: %s" % module_path))
-		return false
-	
-	var code = file.get_as_text()
-	file.close()
-	
-	# Lex and parse the module
-	var lexer = Lexer.new(code)
-	if lexer.lex() != OK:
-		raise_error(EvalError.new(EvalError.RUNTIME_ERROR, "Failed to lex module: %s" % lexer.get_error()))
-		return false
-	
-	var parser = Parser.new(lexer.get_tokens())
-	if parser.parse() != OK:
-		raise_error(EvalError.new(EvalError.RUNTIME_ERROR, "Failed to parse module: %s" % parser.get_error()))
-		return false
-	
-	var program = parser.get_program()
-	
-	# Create isolated environment for the module
-	var module_env = EvalEnvironment.new()
-	var prev_env = current_env
-	var prev_file = current_file_path
-	current_env = module_env
-	current_file_path = module_path
-	
-	# Store original functions/classes
-	var prev_functions = functions.duplicate()
-	var prev_classes = classes.duplicate()
-	
-	# Execute module code
-	for statement in program.statements:
-		eval(statement)
-		if had_error:
-			current_env = prev_env
-			current_file_path = prev_file
-			return false
-	
-	# Collect exports (all top-level functions and classes)
-	var module_data = {
-		"functions": {},
-		"classes": {}
-	}
-	
-	# Get new functions defined in this module
-	for func_name in functions:
-		if not prev_functions.has(func_name):
-			module_data.functions[func_name] = functions[func_name]
-	
-	# Get new classes defined in this module
-	for name_class in classes:
-		if not prev_classes.has(name_class):
-			module_data.classes[name_class] = classes[name_class]
-	
-	# Restore original state
-	functions = prev_functions
-	classes = prev_classes
-	current_env = prev_env
-	current_file_path = prev_file
-	
-	# Store module data
-	loaded_modules[module_path] = module_data
-	
-	return true
-
 func instantiate_class_from_module(module_data: Dictionary, name_class: String, args: Array):
 	if not module_data.classes.has(name_class):
 		raise_error(EvalError.new(EvalError.NAME_ERROR, "Module has no class '%s'" % name_class))
 		return null
 	
 	var class_def = module_data.classes[name_class]
+	
+	# PATCH START: Delegate to GDScript instantiation if necessary
+	if class_def is GDScript:
+		return instantiate_gdscript_class(class_def, args)
+	# PATCH END
+	
 	var instance = StarchInstance.new(name_class, class_def)
 	
 	var class_env = EvalEnvironment.new(current_env)
 	
 	# Handle parent classes...
 	if class_def.parent and class_def.parent != "":
-		# Check if parent is in same module first
+		var parent_def = null
+		
+		# 1. Check if parent is in same module first
 		if module_data.classes.has(class_def.parent):
-			var parent_def = module_data.classes[class_def.parent]
-			# ... inherit from parent
+			parent_def = module_data.classes[class_def.parent]
+		# 2. Check global classes (already imported/defined)
 		elif classes.has(class_def.parent):
-			var parent_def = classes[class_def.parent]
-			# ... inherit from parent
-		else:
+			parent_def = classes[class_def.parent]
+		
+		if parent_def and parent_def is ASTClassDeclaration:
+			# Inherit parent variables
+			for member in parent_def.members:
+				if member is ASTVarDeclaration:
+					var value = eval(member.value) if member.value else null
+					class_env.define(member.name, value, member.is_const)
+			
+			# Inherit parent methods
+			for member in parent_def.members:
+				if member is ASTFunctionDeclaration:
+					instance.methods[member.name] = member
+		elif not parent_def:
 			raise_error(EvalError.new(EvalError.NAME_ERROR, "Parent class '%s' not found" % class_def.parent))
+			return null
+		else:
+			raise_error(EvalError.new(EvalError.TYPE_ERROR, "Cannot inherit from non-Starch parent class '%s' imported from module" % class_def.parent))
 			return null
 	
 	# Define members
@@ -1233,6 +1246,207 @@ func instantiate_class_from_module(module_data: Dictionary, name_class: String, 
 		call_instance_method(instance, "_init", args)
 	
 	return instance
+
+func resolve_module_path(module_name: String) -> String:
+	var base_dir = ""
+	if current_file_path != "":
+		base_dir = current_file_path.get_base_dir()
+	
+	var lib = "user://potatofs/system/lib"
+	var bin = "user://potatofs/system/bin"
+	
+	var potential_paths = [
+		base_dir.path_join(module_name),
+		"res://" + module_name,
+		lib.path_join(module_name),
+		bin.path_join(module_name)
+	]
+	
+	# Check for both .starch and .gd extensions
+	for path in potential_paths:
+		if FileAccess.file_exists(path):
+			return path
+		elif FileAccess.file_exists(path + ".starch"):
+			return path + ".starch"
+		elif FileAccess.file_exists(path + ".gd"):
+			return path + ".gd"
+	
+	return ""
+
+func load_module(module_path: String) -> bool:
+	# Check if it's a GDScript module
+	if module_path.ends_with(".gd"):
+		return load_gdscript_module(module_path)
+	else:
+		return load_starch_module(module_path)
+
+func load_starch_module(module_path: String) -> bool:
+	# Your existing load_module() code goes here unchanged
+	var file = FileAccess.open(module_path, FileAccess.READ)
+	if not file:
+		raise_error(EvalError.new(EvalError.RUNTIME_ERROR, "Failed to open module file: %s" % module_path))
+		return false
+	
+	var code = file.get_as_text()
+	file.close()
+	
+	var lexer = Lexer.new(code)
+	if lexer.lex() != OK:
+		raise_error(EvalError.new(EvalError.RUNTIME_ERROR, "Failed to lex module: %s" % lexer.get_error()))
+		return false
+	
+	var parser = Parser.new(lexer.get_tokens())
+	if parser.parse() != OK:
+		raise_error(EvalError.new(EvalError.RUNTIME_ERROR, "Failed to parse module: %s" % parser.get_error()))
+		return false
+	
+	var program = parser.get_program()
+	
+	var module_env = EvalEnvironment.new()
+	var prev_env = current_env
+	var prev_file = current_file_path
+	current_env = module_env
+	current_file_path = module_path
+	
+	var prev_functions = functions.duplicate()
+	var prev_classes = classes.duplicate()
+	
+	for statement in program.statements:
+		eval(statement)
+		if had_error:
+			current_env = prev_env
+			current_file_path = prev_file
+			return false
+	
+	var module_data = {
+		"functions": {},
+		"classes": {}
+	}
+	
+	for func_name in functions:
+		if not prev_functions.has(func_name):
+			module_data.functions[func_name] = functions[func_name]
+	
+	for name_class in classes:
+		if not prev_classes.has(name_class):
+			module_data.classes[name_class] = classes[name_class]
+	
+	functions = prev_functions
+	classes = prev_classes
+	current_env = prev_env
+	current_file_path = prev_file
+	
+	loaded_modules[module_path] = module_data
+	
+	return true
+
+func load_gdscript_module(module_path: String) -> bool:
+	var script = load(module_path)
+	if not script:
+		raise_error(EvalError.new(EvalError.RUNTIME_ERROR, "Failed to load GDScript module: %s" % module_path))
+		return false
+	
+	# Check if it's a valid GDScript
+	if not script is GDScript:
+		raise_error(EvalError.new(EvalError.RUNTIME_ERROR, "File is not a valid GDScript: %s" % module_path))
+		return false
+	
+	# Instantiate the module script to check for exported dictionaries/methods
+	var instance
+	# PATCH: Check if the script can be instantiated before calling new()
+	if script.can_instantiate():
+		instance = script.new()
+	# END PATCH
+	
+	var module_data = {
+		"functions": {},
+		"classes": {}
+	}
+	
+	if instance:
+		# Extract methods from _methods dictionary
+		if instance.has_method("_get_methods") or "_methods" in instance:
+			var methods = instance._methods if "_methods" in instance else instance._get_methods()
+			
+			if typeof(methods) == TYPE_DICTIONARY:
+				for method_name in methods:
+					var callable_obj = methods[method_name]
+					
+					if callable_obj is Callable:
+						# Store a wrapper function to ensure the Starch calling convention 
+						# (single array argument) is mapped correctly to the GDScript signature 
+						# (single positional argument `args`).
+						var wrapped_callable = func(starch_args_array):
+							# Starch passes one argument: the array of parameters (starch_args_array)
+							
+							# We need to call the GDScript method, passing that array as the *first positional argument*.
+							var args_for_callv = [starch_args_array]
+							
+							if instance.has_method(method_name):
+								return instance.callv(method_name, args_for_callv)
+							else:
+								# Fallback for bare callables (less common for module exports)
+								return callable_obj.callv(args_for_callv)
+
+						module_data.functions[method_name] = wrapped_callable
+					else:
+						push_warning("[Interpreter] Method '%s' in module '%s' is not callable" % [method_name, module_path])
+			# ...
+		
+		# Extract classes from _classes dictionary
+		if instance.has_method("_get_classes") or "_classes" in instance:
+			var classes_dict = instance._classes if "_classes" in instance else instance._get_classes()
+			
+			if typeof(classes_dict) == TYPE_DICTIONARY:
+				for name_class in classes_dict:
+					var class_script = classes_dict[name_class]
+					if class_script is GDScript:
+						# Store the script for later instantiation
+						module_data.classes[name_class] = class_script
+	
+	# PATCH START: Export the GDScript file's primary class definition if available
+	if script.get_name() != "":
+		# We assume the main class name is the class name defined inside the file.
+		module_data.classes[script.get_name()] = script
+	# PATCH END
+	
+	loaded_modules[module_path] = module_data
+	return true
+
+func instantiate_gdscript_class(class_script: GDScript, args: Array):
+	var instance = class_script.new()
+	if not instance:
+		raise_error(EvalError.new(EvalError.RUNTIME_ERROR, "Failed to instantiate GDScript class"))
+		return null
+	
+	# Call _init if it exists and expects arguments
+	
+	# Check for a starch_init method for custom initialisation
+	# PATCH: Use callv to pass arguments correctly
+	if instance.has_method("starch_init"):
+		instance.callv("starch_init", args)
+	# PATCH END
+	
+	return GDScriptInstanceWrapper.new(instance)
+
+class StarchBoundMethod:
+	var instance: StarchInstance
+	var method_name: String
+	
+	func _init(inst, name):
+		instance = inst
+		method_name = name
+
+class GDScriptInstanceWrapper:
+	var gd_instance: Object
+	
+	func _init(instance):
+		gd_instance = instance
+	
+	func _to_string() -> String:
+		if gd_instance.has_method("_to_string"):
+			return gd_instance._to_string()
+		return "<GDScript instance of %s>" % gd_instance.get_class()
 
 class StarchInstance:
 	var name_class: String
