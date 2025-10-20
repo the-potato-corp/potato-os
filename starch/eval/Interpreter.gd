@@ -1108,16 +1108,20 @@ func resolve_module_path(module_name: String) -> String:
 	if current_file_path != "":
 		base_dir = current_file_path.get_base_dir()
 	
-	# Try with .starch extension
+	var lib = "user://potatofs/system/lib"
+	var bin = "user://potatofs/system/bin"
+	
 	var potential_paths = [
-		base_dir.path_join(module_name + ".starch"),
 		base_dir.path_join(module_name),
-		"res://" + module_name + ".starch",
 		"res://" + module_name,
+		lib.path_join(module_name),
+		bin.path_join(module_name)
 	]
 	
 	for path in potential_paths:
 		if FileAccess.file_exists(path):
+			return path
+		elif FileAccess.file_exists(path + ".starch"):
 			return path
 	
 	return ""
