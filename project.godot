@@ -11,7 +11,7 @@ config_version=5
 [application]
 
 config/name="PotatoOS"
-run/main_scene="uid://v4rthvt0o4xs"
+run/main_scene="uid://dnpy061ln7mr6"
 config/use_custom_user_dir=true
 config/custom_user_dir_name="PotatoCorp/PotatoOS"
 config/features=PackedStringArray("4.5", "Forward Plus")

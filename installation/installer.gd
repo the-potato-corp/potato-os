@@ -1,5 +1,6 @@
 extends Node
 
+@export var main_scene: PackedScene
 var base_url: String = "http://potato-os.github.io"
 var stream: String = "latest"
 var version: String = "v0.0.0"
@@ -52,6 +53,9 @@ func _ready() -> void:
 				print(hash[1])
 				print("File download unverified: ", name)
 				# what now?
+	
+	print()
+	get_tree().change_scene_to_packed(main_scene)
 
 func get_data() -> Dictionary:
 	print("Getting PotatoFS data...")

@@ -1,0 +1,8 @@
+[gd_scene load_steps=3 format=3 uid="uid://dnpy061ln7mr6"]
+
+[ext_resource type="Script" uid="uid://dqfqg1iyap2cs" path="res://installation/installer.gd" id="1_ji48n"]
+[ext_resource type="PackedScene" uid="uid://v4rthvt0o4xs" path="res://starch/sample.tscn" id="2_npqrx"]
+
+[node name="Installer" type="Node"]
+script = ExtResource("1_ji48n")
+main_scene = ExtResource("2_npqrx")
