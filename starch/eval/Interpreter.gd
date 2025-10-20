@@ -10,11 +10,17 @@ var should_continue: bool = false
 var should_return: bool = false
 var return_value = null
 var last_error: EvalError = null
+var current_file_path: String = ""
+var loaded_modules: Dictionary = {}
+var modules: Dictionary = {}
 
 func _init() -> void:
 	global_env = EvalEnvironment.new()
 	current_env = global_env
 	setup_builtins()
+
+func set_file_path(path: String) -> void:
+	current_file_path = path
 
 func setup_builtins() -> void:
 	functions["print"] = func(args):
@@ -56,6 +62,67 @@ func setup_builtins() -> void:
 		if args.size() > 0:
 			return type_string(typeof(args[0]))
 		return "unknown"
+	
+	functions["super"] = func(args):
+		if not current_env.has("this"):
+			raise_error(EvalError.new(EvalError.RUNTIME_ERROR, "super() can only be called from within a class method"))
+			return null
+		
+		var instance = current_env.get_var("this")
+		if not instance is StarchInstance:
+			raise_error(EvalError.new(EvalError.RUNTIME_ERROR, "super() called on non-instance"))
+			return null
+		
+		if not instance.class_def.parent or instance.class_def.parent == "":
+			raise_error(EvalError.new(EvalError.RUNTIME_ERROR, "Class '%s' has no parent" % instance.name_class))
+			return null
+		
+		if not classes.has(instance.class_def.parent):
+			raise_error(EvalError.new(EvalError.NAME_ERROR, "Parent class '%s' not defined" % instance.class_def.parent))
+			return null
+		
+		# Find parent's _init method
+		var parent_class = classes[instance.class_def.parent]
+		var parent_init = null
+		for member in parent_class.members:
+			if member is ASTFunctionDeclaration and member.name == "_init":
+				parent_init = member
+				break
+		
+		if not parent_init:
+			return null
+		
+		# Create method environment with 'this' bound to the instance
+		var method_env = EvalEnvironment.new(instance.env)
+		method_env.define("this", instance, true)
+		
+		# Bind parameters
+		for i in range(parent_init.parameters.size()):
+			var param = parent_init.parameters[i]
+			var value
+			
+			if i < args.size():
+				value = args[i]
+			elif param.default_value != null:
+				value = eval(param.default_value)
+			else:
+				raise_error(EvalError.new(EvalError.TYPE_ERROR, "Missing argument for parameter: %s" % param.name))
+				return null
+			
+			method_env.define(param.name, value, false)
+		
+		# Execute parent's _init
+		var prev_env = current_env
+		current_env = method_env
+		
+		for statement in parent_init.body:
+			eval(statement)
+			if had_error:
+				break
+		
+		current_env = prev_env
+		
+		return null
 
 func raise_error(error: EvalError) -> void:
 	push_error(error.message)
@@ -94,6 +161,10 @@ func eval(node: ASTNode):
 			return node.value
 		
 		"ASTIdentifier":
+			# Check if it's a module name
+			if modules.has(node.name):
+				return ModuleProxy.new(node.name, modules[node.name])
+			
 			if not current_env.has(node.name):
 				raise_error(EvalError.new(EvalError.NAME_ERROR, "name '%s' is not defined" % node.name))
 				return null
@@ -169,6 +240,12 @@ func eval(node: ASTNode):
 		
 		"ASTTernaryOp":
 			return eval_ternary(node)
+		
+		"ASTUsingStatement":
+			return eval_using(node)
+		
+		"ASTUsingFromStatement":
+			return eval_using_from(node)
 		
 		_:
 			raise_error(EvalError.new(EvalError.RUNTIME_ERROR, "Unknown node type: %s" % name))
@@ -271,17 +348,32 @@ func eval_function_call(node: ASTFunctionCall):
 		return call_user_function(func_def, args, node)
 	
 	elif callee is ASTMemberAccess:
-		var obj = eval(callee.object)
+		# First evaluate to see what we're dealing with
+		var func_or_obj = eval(callee)
 		if had_error:
 			return null
 		
-		var method_name = callee.member
-		
+		# Evaluate arguments
 		var args = []
 		for arg in node.arguments:
 			args.append(eval(arg))
 			if had_error:
 				return null
+		
+		# If it's a callable (function from module or builtin), just call it
+		if func_or_obj is Callable:
+			return func_or_obj.call(args)
+		
+		# If it's a user function definition, call it
+		if func_or_obj is ASTFunctionDeclaration:
+			return call_user_function(func_or_obj, args, node)
+		
+		# Otherwise it's a method call on an instance
+		var obj = eval(callee.object)
+		if had_error:
+			return null
+		
+		var method_name = callee.member
 		
 		if obj is StarchInstance:
 			return call_instance_method(obj, method_name, args)
@@ -682,21 +774,38 @@ func eval_member_access(node: ASTMemberAccess):
 	if had_error:
 		return null
 	
-	if obj is StarchInstance:
-		if obj.env.has(node.member):
-			return obj.env.get_var(node.member)
+	# Handle module member access
+	if obj is ModuleProxy:
+		var member_name = node.member
+		
+		if obj.module_data.functions.has(member_name):
+			return obj.module_data.functions[member_name]
+		elif obj.module_data.classes.has(member_name):
+			var name_class = member_name
+			var class_def = obj.module_data.classes[name_class]
+			# Return class constructor
+			return func(args):
+				return instantiate_class_from_module(obj.module_data, name_class, args)
 		else:
-			raise_error(EvalError.new(EvalError.ATTRIBUTE_ERROR, "Instance of '%s' has no attribute '%s'" % [obj.name_class, node.member]))
+			raise_error(EvalError.new(EvalError.ATTRIBUTE_ERROR, "Module '%s' has no attribute '%s'" % [obj.name, member_name]))
+			return null
+	
+	# Normal instance member access
+	if obj is StarchInstance:
+		if obj.env.has(node.property):
+			return obj.env.get_var(node.property)
+		else:
+			raise_error(EvalError.new(EvalError.ATTRIBUTE_ERROR, "Instance of '%s' has no attribute '%s'" % [obj.name_class, node.property]))
 			return null
 	
 	if typeof(obj) == TYPE_DICTIONARY:
-		if node.member in obj:
-			return obj[node.member]
+		if node.property in obj:
+			return obj[node.property]
 		else:
-			raise_error(EvalError.new(EvalError.KEY_ERROR, "Key '%s' not found in dictionary" % node.member))
+			raise_error(EvalError.new(EvalError.KEY_ERROR, "Key '%s' not found in dictionary" % node.property))
 			return null
 	else:
-		raise_error(EvalError.new(EvalError.ATTRIBUTE_ERROR, "Cannot access property '%s' on type %s" % [node.member, type_string(typeof(obj))]))
+		raise_error(EvalError.new(EvalError.ATTRIBUTE_ERROR, "Cannot access property '%s' on type %s" % [node.property, type_string(typeof(obj))]))
 		return null
 
 func eval_index_access(node: ASTIndexAccess):
@@ -846,6 +955,26 @@ func instantiate_class(name_class: String, args: Array):
 	
 	var class_env = EvalEnvironment.new(current_env)
 	
+	# First, inherit parent class members and methods if there's a parent
+	if class_def.parent and class_def.parent != "":
+		if not classes.has(class_def.parent):
+			raise_error(EvalError.new(EvalError.NAME_ERROR, "Parent class '%s' is not defined" % class_def.parent))
+			return null
+		
+		var parent_def = classes[class_def.parent]
+		
+		# Inherit parent variables
+		for member in parent_def.members:
+			if member is ASTVarDeclaration:
+				var value = eval(member.value) if member.value else null
+				class_env.define(member.name, value, member.is_const)
+		
+		# Inherit parent methods
+		for member in parent_def.members:
+			if member is ASTFunctionDeclaration:
+				instance.methods[member.name] = member
+	
+	# Then add/override with current class members
 	for member in class_def.members:
 		if member is ASTVarDeclaration:
 			var value = eval(member.value) if member.value else null
@@ -885,8 +1014,8 @@ func call_instance_method(instance: StarchInstance, method_name: String, args: A
 			raise_error(EvalError.new(EvalError.TYPE_ERROR, "Missing argument for parameter: %s" % param.name))
 			return null
 		
-		if param.param_type and param.param_type != "":
-			if not check_type(value, param.param_type):
+		if param.type_hint and param.type_hint != "":
+			if not check_type(value, param.type_hint):
 				return null
 		
 		method_env.define(param.name, value, false)
@@ -925,6 +1054,182 @@ func eval_block(statements: Array):
 	current_env = prev_env
 	return result
 
+func eval_using(node: ASTUsingStatement):
+	var module_name = node.module
+	var module_path = resolve_module_path(module_name)
+	
+	if not module_path:
+		raise_error(EvalError.new(EvalError.NAME_ERROR, "Module '%s' not found" % module_name))
+		return null
+	
+	# Load the module if not already loaded
+	if not loaded_modules.has(module_path):
+		if not load_module(module_path):
+			return null
+	
+	# Store module reference (for namespaced access)
+	modules[module_name] = loaded_modules[module_path]
+	
+	return null
+
+func eval_using_from(node: ASTUsingFromStatement):
+	var module_name = node.module
+	var imports = node.names
+	var module_path = resolve_module_path(module_name)
+	
+	if not module_path:
+		raise_error(EvalError.new(EvalError.NAME_ERROR, "Module '%s' not found" % module_name))
+		return null
+	
+	# Load the module if not already loaded
+	if not loaded_modules.has(module_path):
+		if not load_module(module_path):
+			return null
+	
+	# Import specified items into global scope
+	var module_data = loaded_modules[module_path]
+	
+	for item_name in imports:
+		if module_data.functions.has(item_name):
+			functions[item_name] = module_data.functions[item_name]
+		elif module_data.classes.has(item_name):
+			classes[item_name] = module_data.classes[item_name]
+			functions[item_name] = func(args):
+				return instantiate_class(item_name, args)
+		else:
+			raise_error(EvalError.new(EvalError.NAME_ERROR, "Module '%s' has no export '%s'" % [module_name, item_name]))
+			return null
+	
+	return null
+
+func resolve_module_path(module_name: String) -> String:
+	# If current_file_path is empty, assume we're in the project root
+	var base_dir = ""
+	if current_file_path != "":
+		base_dir = current_file_path.get_base_dir()
+	
+	# Try with .starch extension
+	var potential_paths = [
+		base_dir.path_join(module_name + ".starch"),
+		base_dir.path_join(module_name),
+		"res://" + module_name + ".starch",
+		"res://" + module_name,
+	]
+	
+	for path in potential_paths:
+		if FileAccess.file_exists(path):
+			return path
+	
+	return ""
+
+func load_module(module_path: String) -> bool:
+	var file = FileAccess.open(module_path, FileAccess.READ)
+	if not file:
+		raise_error(EvalError.new(EvalError.RUNTIME_ERROR, "Failed to open module file: %s" % module_path))
+		return false
+	
+	var code = file.get_as_text()
+	file.close()
+	
+	# Lex and parse the module
+	var lexer = Lexer.new(code)
+	if lexer.lex() != OK:
+		raise_error(EvalError.new(EvalError.RUNTIME_ERROR, "Failed to lex module: %s" % lexer.get_error()))
+		return false
+	
+	var parser = Parser.new(lexer.get_tokens())
+	if parser.parse() != OK:
+		raise_error(EvalError.new(EvalError.RUNTIME_ERROR, "Failed to parse module: %s" % parser.get_error()))
+		return false
+	
+	var program = parser.get_program()
+	
+	# Create isolated environment for the module
+	var module_env = EvalEnvironment.new()
+	var prev_env = current_env
+	var prev_file = current_file_path
+	current_env = module_env
+	current_file_path = module_path
+	
+	# Store original functions/classes
+	var prev_functions = functions.duplicate()
+	var prev_classes = classes.duplicate()
+	
+	# Execute module code
+	for statement in program.statements:
+		eval(statement)
+		if had_error:
+			current_env = prev_env
+			current_file_path = prev_file
+			return false
+	
+	# Collect exports (all top-level functions and classes)
+	var module_data = {
+		"functions": {},
+		"classes": {}
+	}
+	
+	# Get new functions defined in this module
+	for func_name in functions:
+		if not prev_functions.has(func_name):
+			module_data.functions[func_name] = functions[func_name]
+	
+	# Get new classes defined in this module
+	for name_class in classes:
+		if not prev_classes.has(name_class):
+			module_data.classes[name_class] = classes[name_class]
+	
+	# Restore original state
+	functions = prev_functions
+	classes = prev_classes
+	current_env = prev_env
+	current_file_path = prev_file
+	
+	# Store module data
+	loaded_modules[module_path] = module_data
+	
+	return true
+
+func instantiate_class_from_module(module_data: Dictionary, name_class: String, args: Array):
+	if not module_data.classes.has(name_class):
+		raise_error(EvalError.new(EvalError.NAME_ERROR, "Module has no class '%s'" % name_class))
+		return null
+	
+	var class_def = module_data.classes[name_class]
+	var instance = StarchInstance.new(name_class, class_def)
+	
+	var class_env = EvalEnvironment.new(current_env)
+	
+	# Handle parent classes...
+	if class_def.parent and class_def.parent != "":
+		# Check if parent is in same module first
+		if module_data.classes.has(class_def.parent):
+			var parent_def = module_data.classes[class_def.parent]
+			# ... inherit from parent
+		elif classes.has(class_def.parent):
+			var parent_def = classes[class_def.parent]
+			# ... inherit from parent
+		else:
+			raise_error(EvalError.new(EvalError.NAME_ERROR, "Parent class '%s' not found" % class_def.parent))
+			return null
+	
+	# Define members
+	for member in class_def.members:
+		if member is ASTVarDeclaration:
+			var value = eval(member.value) if member.value else null
+			class_env.define(member.name, value, member.is_const)
+	
+	for member in class_def.members:
+		if member is ASTFunctionDeclaration:
+			instance.methods[member.name] = member
+	
+	instance.env = class_env
+	
+	if instance.methods.has("_init"):
+		call_instance_method(instance, "_init", args)
+	
+	return instance
+
 class StarchInstance:
 	var name_class: String
 	var class_def: ASTClassDeclaration
@@ -937,3 +1242,11 @@ class StarchInstance:
 	
 	func _to_string() -> String:
 		return "<instance of %s>" % name_class
+
+class ModuleProxy:
+	var name: String
+	var module_data: Dictionary
+	
+	func _init(n: String, data: Dictionary):
+		name = n
+		module_data = data

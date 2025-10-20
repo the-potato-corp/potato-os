@@ -1,5 +1,1 @@
-function main(text or "Hello, World!") -> void {
-	print(text.upper());
-}
-
-main();
+for i in [1..100] {}

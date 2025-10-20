@@ -28,8 +28,10 @@ func get_error() -> String:
 func log_text(level: String, text: String) -> void:
 	match level:
 		"debug":
+			return
 			print("[Lexer] ", text)
 		"log":
+			return
 			print("[Lexer] ", text)
 		"warn":
 			push_warning("[Lexer] ", text)
