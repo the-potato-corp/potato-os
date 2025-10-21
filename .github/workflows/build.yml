@@ -29,7 +29,7 @@ jobs:
       - name: Build Linux
         run: |
           mkdir -v -p build/linux
-          godot --headless --verbose --export-release "Linux/X11" build/linux/game.x86_64
+          godot --headless --verbose --export-release "Linux" build/linux/game.x86_64
       
       - name: Build Windows
         run: |
