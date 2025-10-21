@@ -1,8 +1,85 @@
-[gd_scene load_steps=3 format=3 uid="uid://dnpy061ln7mr6"]
+[gd_scene load_steps=6 format=3 uid="uid://dnpy061ln7mr6"]
 
 [ext_resource type="Script" uid="uid://dqfqg1iyap2cs" path="res://installation/installer.gd" id="1_ji48n"]
 [ext_resource type="PackedScene" uid="uid://v4rthvt0o4xs" path="res://starch/sample.tscn" id="2_npqrx"]
+[ext_resource type="Texture2D" uid="uid://c6vvxptj3o1si" path="res://assets/transparent_1760998855_1979.svg" id="3_s2yil"]
+[ext_resource type="FontFile" uid="uid://dcxmm3tyfxv4h" path="res://assets/font/JosefinSans-Regular.ttf" id="4_lbk54"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_s2yil"]
+bg_color = Color(0.19434926, 0.19434929, 0.19434917, 1)
+border_width_left = 100
+border_width_top = 200
+border_width_right = 100
+border_width_bottom = 100
+border_color = Color(0.8, 0.8, 0.8, 0)
 
 [node name="Installer" type="Node"]
 script = ExtResource("1_ji48n")
 main_scene = ExtResource("2_npqrx")
+
+[node name="Control" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="ColorRect" type="ColorRect" parent="Control"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 1)
+
+[node name="Wordmark" type="HBoxContainer" parent="Control"]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -211.0
+offset_right = 211.0
+offset_bottom = 151.0
+grow_horizontal = 2
+
+[node name="TextureRect" type="TextureRect" parent="Control/Wordmark"]
+layout_mode = 2
+texture = ExtResource("3_s2yil")
+
+[node name="Label" type="Label" parent="Control/Wordmark"]
+layout_mode = 2
+size_flags_vertical = 1
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_fonts/font = ExtResource("4_lbk54")
+theme_override_font_sizes/font_size = 64
+text = "PotatoOS"
+vertical_alignment = 1
+
+[node name="Terminal" type="Panel" parent="Control"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_s2yil")
+
+[node name="MarginContainer" type="MarginContainer" parent="Control/Terminal"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 120
+theme_override_constants/margin_top = 220
+theme_override_constants/margin_right = 120
+theme_override_constants/margin_bottom = 120
+
+[node name="Output" type="RichTextLabel" parent="Control/Terminal/MarginContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+scroll_active = false
+scroll_following = true

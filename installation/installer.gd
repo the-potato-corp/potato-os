@@ -5,24 +5,28 @@ var base_url: String = "http://potato-os.github.io"
 var stream: String = "latest"
 var version: String = "v0.0.0"
 var update: bool = false
+var logs: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://installation/logs.json"))
+
+func push_text(text: String) -> void:
+	%Output.text += text + "\n"
 
 func _ready() -> void:
 	if FileAccess.file_exists("user://version"):
-		print("Finding version...")
+		push_text("Finding version...")
 		version = FileAccess.get_file_as_string("user://version")
 	else:
-		print("Saving version...")
+		push_text("Saving version...")
 		FileAccess.open("user://version", FileAccess.WRITE).store_string(version)
 	
 	var dir: DirAccess = DirAccess.open("user://")
 	if "potatofs" not in dir.get_directories():
-		print("Initialising PotatoFS...")
+		push_text("Initialising PotatoFS...")
 		dir.make_dir("potatofs")
 	
 	var new_version: String = await get_version()
 	if semver_greater(new_version, version):
 		update = true
-		print("Update available!")
+		push_text("Update available!")
 	
 	# Check hashes
 	var data: Dictionary = await get_data()
@@ -35,55 +39,60 @@ func _ready() -> void:
 		
 		if FileAccess.file_exists(path):
 			if hash_file(path, hash[0]) == hash[1]:
-				print("File valid: ", name)
+				push_text("File valid: " + name)
 			else:
-				print("Found invalid file: ", name)
+				push_text("Found invalid file: " + name)
 				await download_file(url, path)
 				if hash_file(path, hash[0]) == hash[1]:
-					print("File valid: ", name)
+					push_text("File valid: " + name)
 				else:
-					print("File download unverified: ", name)
+					push_text("File download unverified: " + name)
 					# now what?
 		else:
 			await download_file(url, path)
 			if hash_file(path, hash[0]) == hash[1]:
-				print("File valid: ", name)
+				push_text("File valid: " + name)
 			else:
-				print(hash_file(path, hash[0]))
-				print(hash[1])
-				print("File download unverified: ", name)
+				push_text("File download unverified: " + name)
 				# what now?
 	
-	print()
+	for text in logs["log_sequence"]:
+		push_text(text["message"])
+		await get_tree().create_timer(randf_range(0.01, 0.2)).timeout
+	
+	await get_tree().create_timer(0.8).timeout
+	push_text("\nWelcome, user.")
+	await get_tree().create_timer(2).timeout
+	
 	get_tree().change_scene_to_packed(main_scene)
 
 func get_data() -> Dictionary:
-	print("Getting PotatoFS data...")
+	push_text("Getting PotatoFS data...")
 	var data: Array = await make_request(base_url.path_join(version + "/data.json"))
 	if not data or not is_2xx(data[1]):
-		print("Failed to get FS data.")
+		push_text("Failed to get FS data.")
 		return {}
 	
 	var body: String = data[3].get_string_from_utf8()
 	var fs: Variant = JSON.parse_string(body)
 	if not fs:
-		print("Invalid FS data.")
+		push_text("Invalid FS data.")
 		return {}
 		
 	return fs # just hope it's a dictionary. just pray.
 
 func get_version() -> String:
-	print("Getting update data...")
+	push_text("Getting update data...")
 	var data: Array = await make_request(base_url.path_join("channels.cfg"))
 	if not data or not is_2xx(data[1]):
-		print("Failed to get channel index.")
+		push_text("Failed to get channel index.")
 		return ""
 	
 	var body: PackedByteArray = data[3]
 	var channels: ConfigFile = ConfigFile.new()
 	var error: Error = channels.parse(body.get_string_from_utf8())
 	if error != OK:
-		print("Invalid channel index.")
+		push_text("Invalid channel index.")
 		return ""
 	
 	return channels.get_value("channels", stream, "")
@@ -95,7 +104,7 @@ func hash_file(path: String, method: String) -> String:
 		"md5":
 			return FileAccess.get_md5(path)
 		_:
-			print("Unsupported hashing method: ", method)
+			push_text("Unsupported hashing method: " + method)
 			return ""
 
 func semver_greater(a: String, b: String) -> bool:
@@ -128,7 +137,7 @@ func is_2xx(code: int) -> bool:
 
 func download_file(url: String, path: String) -> bool:
 	DirAccess.make_dir_recursive_absolute(path.rsplit("/", true, 1)[0])
-	print("Downloading ", path, "...")
+	push_text("Downloading " + path + "...")
 	var result: Array = await make_request(url)
 	if is_2xx(result[1]):
 		var access: FileAccess = FileAccess.open(path, FileAccess.WRITE)
