@@ -1,10 +1,11 @@
-[gd_scene load_steps=8 format=3 uid="uid://hyd7pu8lxqk3"]
+[gd_scene load_steps=9 format=3 uid="uid://hyd7pu8lxqk3"]
 
 [ext_resource type="Script" uid="uid://cgd4nvbqxd6bk" path="res://window/window.gd" id="1_fv8kw"]
 [ext_resource type="Texture2D" uid="uid://crlu8077whvsu" path="res://assets/minimise.svg" id="1_nfq5s"]
 [ext_resource type="Texture2D" uid="uid://c6vvxptj3o1si" path="res://assets/logo.svg" id="1_srjdr"]
 [ext_resource type="Texture2D" uid="uid://b5ytua24jc1yt" path="res://assets/close.svg" id="2_nfq5s"]
 [ext_resource type="Texture2D" uid="uid://c5hab26ppj18c" path="res://assets/maximise.svg" id="2_srjdr"]
+[ext_resource type="Texture2D" uid="uid://ipou11gt7mns" path="res://assets/restore.svg" id="5_ddx2d"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_fv8kw"]
 corner_radius_top_left = 8
@@ -62,7 +63,9 @@ stretch_mode = 6
 
 [node name="Maximise" type="TextureButton" parent="TitleBar/ActionButtons"]
 layout_mode = 2
+toggle_mode = true
 texture_normal = ExtResource("2_srjdr")
+texture_pressed = ExtResource("5_ddx2d")
 stretch_mode = 5
 
 [node name="Close" type="TextureButton" parent="TitleBar/ActionButtons"]
@@ -90,3 +93,4 @@ grow_vertical = 2
 mouse_filter = 2
 
 [connection signal="gui_input" from="TitleBar" to="." method="_on_title_bar_input"]
+[connection signal="pressed" from="TitleBar/ActionButtons/Maximise" to="." method="_on_size_pressed"]

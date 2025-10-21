@@ -165,6 +165,16 @@ func eval(node: ASTNode):
 			if modules.has(node.name):
 				return ModuleProxy.new(node.name, modules[node.name])
 			
+			# Check if it's a function
+			if functions.has(node.name):
+				var func_def = functions[node.name]
+				# If it's already a callable (builtin), return it
+				if func_def is Callable:
+					return func_def
+				# Otherwise wrap user function
+				return func(args):
+					return call_user_function(func_def, args, null)
+			
 			if not current_env.has(node.name):
 				raise_error(EvalError.new(EvalError.NAME_ERROR, "name '%s' is not defined" % node.name))
 				return null
@@ -330,12 +340,6 @@ func type_string(type_id: int) -> String:
 func eval_function_call(node: ASTFunctionCall):
 	var callee = node.callee
 	
-	var args = []
-	for arg in node.arguments:
-		args.append(eval(arg))
-		if had_error:
-			return null
-	
 	if callee is ASTIdentifier:
 		var func_name: String = callee.name
 		
@@ -344,6 +348,12 @@ func eval_function_call(node: ASTFunctionCall):
 			return null
 		
 		var func_def = functions[func_name]
+		
+		var args = []
+		for arg in node.arguments:
+			args.append(eval(arg))
+			if had_error:
+				return null
 		
 		if func_def is Callable:
 			return func_def.call(args)
@@ -355,6 +365,13 @@ func eval_function_call(node: ASTFunctionCall):
 		var func_or_obj = eval(callee)
 		if had_error:
 			return null
+		
+		# Evaluate arguments
+		var args = []
+		for arg in node.arguments:
+			args.append(eval(arg))
+			if had_error:
+				return null
 		
 		# If it's a callable (function from module or builtin), just call it
 		if func_or_obj is Callable:
@@ -373,32 +390,28 @@ func eval_function_call(node: ASTFunctionCall):
 		
 		if obj is StarchInstance:
 			return call_instance_method(obj, method_name, args)
+		elif obj is GDScriptInstanceWrapper:
+			return call_gdscript_method(obj.gd_instance, method_name, args)
 		
 		return call_method(obj, method_name, args)
 	
-	elif callee is ASTMemberAccess:
-		# 1. Evaluate the member access itself (might be a bound method, a property, or a class constructor)
-		var member_result = eval(callee)
+	else:
+		# Direct callable evaluation (e.g., stored function variable)
+		var func_val = eval(callee)
 		if had_error:
 			return null
 		
-		# 2. Handle the result of the member access
+		if not func_val is Callable:
+			raise_error(EvalError.new(EvalError.TYPE_ERROR, "Cannot call non-function value"))
+			return null
 		
-		# Case A: If it's a bound method (from Starch or GDScript wrapper) or native Callable
-		if member_result is Callable:
-			return member_result.call(args)
+		var args = []
+		for arg in node.arguments:
+			args.append(eval(arg))
+			if had_error:
+				return null
 		
-		# Case B: If it's a user function definition (e.g., from a module)
-		if member_result is ASTFunctionDeclaration:
-			return call_user_function(member_result, args, node)
-			
-		# PATCH START: Handle bound Starch methods returned by eval_member_access
-		if member_result is StarchBoundMethod:
-			return call_instance_method(member_result.instance, member_result.method_name, args)
-	
-	else:
-		raise_error(EvalError.new(EvalError.TYPE_ERROR, "Cannot call non-identifier or non-member"))
-		return null
+		return func_val.call(args)
 
 func call_method(obj, method_name: String, args: Array):
 	match method_name:
@@ -1351,8 +1364,7 @@ func load_gdscript_module(module_path: String) -> bool:
 		raise_error(EvalError.new(EvalError.RUNTIME_ERROR, "File is not a valid GDScript: %s" % module_path))
 		return false
 	
-	# Instantiate the module script to check for exported dictionaries/methods
-	var instance
+	var instance = null
 	# PATCH: Check if the script can be instantiated before calling new()
 	if script.can_instantiate():
 		instance = script.new()
@@ -1374,24 +1386,21 @@ func load_gdscript_module(module_path: String) -> bool:
 					
 					if callable_obj is Callable:
 						# Store a wrapper function to ensure the Starch calling convention 
-						# (single array argument) is mapped correctly to the GDScript signature 
-						# (single positional argument `args`).
+						# (single array argument) is mapped correctly to the GDScript signature.
 						var wrapped_callable = func(starch_args_array):
 							# Starch passes one argument: the array of parameters (starch_args_array)
 							
-							# We need to call the GDScript method, passing that array as the *first positional argument*.
-							var args_for_callv = [starch_args_array]
-							
+							# FIX: Pass the array of arguments directly to callv.
+							# Do NOT wrap it in another array.
 							if instance.has_method(method_name):
-								return instance.callv(method_name, args_for_callv)
+								return instance.callv(method_name, starch_args_array)
 							else:
 								# Fallback for bare callables (less common for module exports)
-								return callable_obj.callv(args_for_callv)
+								return callable_obj.callv(starch_args_array)
 
 						module_data.functions[method_name] = wrapped_callable
 					else:
 						push_warning("[Interpreter] Method '%s' in module '%s' is not callable" % [method_name, module_path])
-			# ...
 		
 		# Extract classes from _classes dictionary
 		if instance.has_method("_get_classes") or "_classes" in instance:
@@ -1411,6 +1420,10 @@ func load_gdscript_module(module_path: String) -> bool:
 	# PATCH END
 	
 	loaded_modules[module_path] = module_data
+	
+	if instance is not RefCounted:
+		instance.free()
+		
 	return true
 
 func instantiate_gdscript_class(class_script: GDScript, args: Array):
@@ -1419,8 +1432,6 @@ func instantiate_gdscript_class(class_script: GDScript, args: Array):
 		raise_error(EvalError.new(EvalError.RUNTIME_ERROR, "Failed to instantiate GDScript class"))
 		return null
 	
-	# Call _init if it exists and expects arguments
-	
 	# Check for a starch_init method for custom initialisation
 	# PATCH: Use callv to pass arguments correctly
 	if instance.has_method("starch_init"):
@@ -1428,6 +1439,21 @@ func instantiate_gdscript_class(class_script: GDScript, args: Array):
 	# PATCH END
 	
 	return GDScriptInstanceWrapper.new(instance)
+
+func call_gdscript_method(gd_instance, method_name: String, args: Array):
+	if not gd_instance.has_method(method_name):
+		raise_error(EvalError.new(EvalError.ATTRIBUTE_ERROR, "GDScript instance has no method '%s'" % method_name))
+		return null
+	
+	# Args are already evaluated, so Callables are ready to use
+	match args.size():
+		0: return gd_instance.call(method_name)
+		1: return gd_instance.call(method_name, args[0])
+		2: return gd_instance.call(method_name, args[0], args[1])
+		3: return gd_instance.call(method_name, args[0], args[1], args[2])
+		4: return gd_instance.call(method_name, args[0], args[1], args[2], args[3])
+		5: return gd_instance.call(method_name, args[0], args[1], args[2], args[3], args[4])
+		_: return gd_instance.callv(method_name, args)
 
 class StarchBoundMethod:
 	var instance: StarchInstance

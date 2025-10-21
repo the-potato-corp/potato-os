@@ -17,6 +17,14 @@ config/custom_user_dir_name="PotatoCorp/PotatoOS"
 config/features=PackedStringArray("4.5", "Forward Plus")
 config/icon="res://icon.svg"
 
+[autoload]
+
+StarchRuntime="*res://starch/StarchRuntime.gd"
+
+[display]
+
+window/size/mode=4
+
 [file_customization]
 
 folder_colors={

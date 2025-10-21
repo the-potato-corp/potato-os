@@ -1,0 +1,6 @@
+using uselessapi;
+
+function _on_thing_done(data) -> void {
+	print(data);
+}
+uselessapi.do_thing(_on_thing_done);
