@@ -1,0 +1,92 @@
+[gd_scene load_steps=8 format=3 uid="uid://hyd7pu8lxqk3"]
+
+[ext_resource type="Script" uid="uid://cgd4nvbqxd6bk" path="res://window/window.gd" id="1_fv8kw"]
+[ext_resource type="Texture2D" uid="uid://crlu8077whvsu" path="res://assets/minimise.svg" id="1_nfq5s"]
+[ext_resource type="Texture2D" uid="uid://c6vvxptj3o1si" path="res://assets/logo.svg" id="1_srjdr"]
+[ext_resource type="Texture2D" uid="uid://b5ytua24jc1yt" path="res://assets/close.svg" id="2_nfq5s"]
+[ext_resource type="Texture2D" uid="uid://c5hab26ppj18c" path="res://assets/maximise.svg" id="2_srjdr"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_fv8kw"]
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_srjdr"]
+content_margin_left = 4.0
+content_margin_top = 3.0
+content_margin_right = 3.0
+content_margin_bottom = 3.0
+bg_color = Color(0.1254902, 0.1254902, 0.1254902, 1)
+
+[node name="Window" type="Panel"]
+clip_children = 2
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 1
+theme_override_styles/panel = SubResource("StyleBoxFlat_fv8kw")
+script = ExtResource("1_fv8kw")
+
+[node name="TitleBar" type="PanelContainer" parent="."]
+custom_minimum_size = Vector2(0, 32)
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_bottom = 30.0
+grow_horizontal = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_srjdr")
+
+[node name="Info2" type="HBoxContainer" parent="TitleBar"]
+layout_mode = 2
+
+[node name="Icon" type="TextureRect" parent="TitleBar/Info2"]
+layout_mode = 2
+texture = ExtResource("1_srjdr")
+expand_mode = 3
+
+[node name="Title" type="Label" parent="TitleBar/Info2"]
+layout_mode = 2
+text = "Untitled Window"
+
+[node name="ActionButtons" type="HBoxContainer" parent="TitleBar"]
+layout_mode = 2
+alignment = 2
+
+[node name="Minimise" type="TextureButton" parent="TitleBar/ActionButtons"]
+layout_mode = 2
+texture_normal = ExtResource("1_nfq5s")
+stretch_mode = 6
+
+[node name="Maximise" type="TextureButton" parent="TitleBar/ActionButtons"]
+layout_mode = 2
+texture_normal = ExtResource("2_srjdr")
+stretch_mode = 5
+
+[node name="Close" type="TextureButton" parent="TitleBar/ActionButtons"]
+layout_mode = 2
+texture_normal = ExtResource("2_nfq5s")
+stretch_mode = 5
+
+[node name="Content" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Background" type="ColorRect" parent="Content"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = 32.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[connection signal="gui_input" from="TitleBar" to="." method="_on_title_bar_input"]

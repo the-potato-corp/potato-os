@@ -17,6 +17,15 @@ config/custom_user_dir_name="PotatoCorp/PotatoOS"
 config/features=PackedStringArray("4.5", "Forward Plus")
 config/icon="res://icon.svg"
 
+[file_customization]
+
+folder_colors={
+"res://assets/": "blue",
+"res://installation/": "green",
+"res://starch/": "yellow",
+"res://window/": "gray"
+}
+
 [input]
 
 close={
