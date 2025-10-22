@@ -4,7 +4,7 @@ PotatoOS is a potato-themed operating system designed to run on a "host" OS, you
 # How is it coded?
 The entire PotatoOS ecosystem, including the shell, system utilities, and core applications, is built and driven by the STARCH programming language.
 
-STARCH is a modern, C-styled scripting language optimized for performance within the Godot runtime. Its primary function is to act as the native programming interface for PotatoOS, providing seamless, high-level access to all system functions (the STARCH System APIs).
+STARCH is a modern, C-styled scripting language optimized¹ for performance within the Godot runtime. Its primary function is to act as the native programming interface for PotatoOS, providing seamless, high-level access to all system functions (the STARCH System APIs).
 
 # What is this repo?
 The PotatoOS code is stored in many different repositories.
@@ -14,3 +14,5 @@ The PotatoOS code is stored in many different repositories.
 
 # Note
 PotatoOS is in very early development and is currently missing a lot of information. We reccommend that you come back here later if you'd like to download a released build.
+
+¹ It's not at all.
