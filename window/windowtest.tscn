@@ -1,7 +1,6 @@
-[gd_scene load_steps=3 format=3 uid="uid://disytg44ccvuw"]
+[gd_scene load_steps=2 format=3 uid="uid://disytg44ccvuw"]
 
-[ext_resource type="Script" uid="uid://dj7iqipneqbk6" path="res://window/WindowManager.gd" id="1_d3fhy"]
-[ext_resource type="PackedScene" uid="uid://hyd7pu8lxqk3" path="res://window/window.tscn" id="1_l20xx"]
+[ext_resource type="Script" uid="uid://cgd4nvbqxd6bk" path="res://window/window.gd" id="2_d3fhy"]
 
 [node name="Control" type="Control"]
 layout_mode = 3
@@ -10,11 +9,20 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-script = ExtResource("1_d3fhy")
 
-[node name="Window" parent="." instance=ExtResource("1_l20xx")]
-layout_mode = 1
-offset_left = 44.0
-offset_top = 91.0
-offset_right = -530.0
-offset_bottom = -251.0
+[node name="OSWindow" type="Panel" parent="."]
+layout_mode = 0
+offset_left = 206.0
+offset_top = 88.0
+offset_right = 577.0
+offset_bottom = 329.0
+script = ExtResource("2_d3fhy")
+rounded_corners = null
+always_on_top = null
+borderless = null
+unlisted = null
+fullscreen = null
+movable = null
+focusable = null
+resizable = null
+metadata/_custom_type_script = "uid://cgd4nvbqxd6bk"

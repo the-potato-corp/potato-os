@@ -1,10 +1,11 @@
-class_name OSWindow extends Control
+class_name OSWindow extends Panel
 
-@onready var _maximise_button: TextureButton = $TitleBar/ActionButtons/Maximise
-@onready var _manager: Node = get_parent()
+@onready var _maximise_button: TextureButton
+var _handle: int
 
 var _dragging: bool = false
 var _drag_offset: Vector2 = Vector2()
+var _title_bar: Control
 
 enum ResizeMode {
 	NONE,
@@ -59,8 +60,7 @@ func toggle_size():
 	
 	mouse_default_cursor_shape = Control.CURSOR_ARROW
 	
-	if is_node_ready() and get_node_or_null("TitleBar"):
-		$TitleBar.set_default_cursor_shape(Control.CURSOR_ARROW)
+	_title_bar.set_default_cursor_shape(Control.CURSOR_ARROW)
 	
 	if _maximise_button:
 		_is_updating_button = true
@@ -70,9 +70,71 @@ func toggle_size():
 func toggle_visibility():
 	visible = not visible
 
+func _close():
+	WindowManager.unregister_window(_handle)
+	queue_free()
+
 # Internal
+func _init() -> void:
+	# self setup
+	mouse_filter = MOUSE_FILTER_PASS
+	var panel := StyleBoxFlat.new() # this is used only as a mask
+	panel.set_corner_radius_all(8)
+	add_theme_stylebox_override("panel", panel)
+	clip_children = CLIP_CHILDREN_ONLY
+	
+	# Title bar
+	var title_bar := PanelContainer.new()
+	title_bar.custom_minimum_size.y = 32
+	title_bar.set_anchors_preset(PRESET_TOP_WIDE)
+	panel = StyleBoxFlat.new()
+	panel.bg_color = Color("#202020")
+	panel.set_content_margin_all(3)
+	panel.content_margin_left = 4
+	title_bar.add_theme_stylebox_override("panel", panel)
+	title_bar.gui_input.connect(_on_title_bar_input)
+	add_child(title_bar)
+	_title_bar = title_bar
+	
+	# info
+	var info := HBoxContainer.new()
+	title_bar.add_child(info)
+	var icon := TextureRect.new()
+	icon.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+	icon.texture = preload("res://assets/logo.svg")
+	info.add_child(icon)
+	var title := Label.new()
+	title.text = "Untitled Window"
+	info.add_child(title)
+	
+	# action buttons
+	var buttons := HBoxContainer.new()
+	buttons.alignment = BoxContainer.ALIGNMENT_END
+	title_bar.add_child(buttons)
+	var minimise := TextureButton.new()
+	minimise.texture_normal = preload("res://assets/minimise.svg")
+	minimise.pressed.connect(toggle_visibility)
+	buttons.add_child(minimise)
+	var maximise := TextureButton.new()
+	maximise.texture_normal = preload("res://assets/maximise.svg")
+	maximise.pressed.connect(_on_size_pressed)
+	buttons.add_child(maximise)
+	var close := TextureButton.new()
+	close.texture_normal = preload("res://assets/close.svg")
+	close.pressed.connect(_close)
+	buttons.add_child(close)
+	
+	# content
+	var content := ColorRect.new()
+	content.set_anchor(SIDE_RIGHT, 1.0)
+	content.set_anchor(SIDE_BOTTOM, 1.0)
+	content.set_anchor_and_offset(SIDE_TOP, 0.0, 32.0)
+	content.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(content)
+	_maximise_button = maximise
+
 func _ready() -> void:
-	_manager.register_window(self)
+	_handle = WindowManager.register_window(self)
 
 func _get_cursor_for_mode(mode: ResizeMode) -> Control.CursorShape:
 	match mode:
@@ -101,9 +163,6 @@ func _on_title_bar_input(event: InputEvent) -> void:
 			var _local_pos = _global_pos - global_position 
 			
 			_resizing = _get_handle_resize(_local_pos)
-			
-			if _resizing in [ResizeMode.BOTTOM, ResizeMode.BOTTOM_LEFT, ResizeMode.BOTTOM_RIGHT]:
-				_resizing = ResizeMode.NONE
 
 			if _resizing != ResizeMode.NONE:
 				_dragging = false
@@ -128,18 +187,15 @@ func _on_title_bar_input(event: InputEvent) -> void:
 		elif _dragging:
 			global_position = get_global_mouse_position() - _drag_offset
 		else:
-			var _global_pos = get_global_mouse_position()
-			var _local_pos = _global_pos - global_position
+			# Check resize handles relative to the WINDOW, not title bar
+			var _local_pos = get_global_mouse_position() - global_position
 			var _mode = _get_handle_resize(_local_pos)
 			
-			var _title_bar_node = get_node_or_null("TitleBar") 
-			if !_title_bar_node: return
-			
-			if _mode in [ResizeMode.TOP, ResizeMode.TOP_LEFT, ResizeMode.TOP_RIGHT, ResizeMode.LEFT, ResizeMode.RIGHT]:
-				_title_bar_node.set_default_cursor_shape(_get_cursor_for_mode(_mode))
+			# Set cursor for top edges only (title bar can handle these)
+			if _mode in [ResizeMode.TOP, ResizeMode.TOP_LEFT, ResizeMode.TOP_RIGHT]:
+				_title_bar.set_default_cursor_shape(_get_cursor_for_mode(_mode))
 			else:
-				_title_bar_node.set_default_cursor_shape(Control.CURSOR_ARROW)
-
+				set_default_cursor_shape(Control.CURSOR_ARROW)
 
 func _gui_input(event: InputEvent):
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
