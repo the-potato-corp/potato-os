@@ -90,5 +90,29 @@ anchor_bottom = 1.0
 offset_top = 32.0
 mouse_filter = 2
 
+[node name="Blockers" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="ReferenceRect" type="ReferenceRect" parent="Blockers"]
+layout_mode = 1
+anchors_preset = -1
+anchor_bottom = 1.0
+offset_right = 8.0
+border_width = 3.0
+
+[node name="ReferenceRect2" type="ReferenceRect" parent="Blockers"]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -8.0
+border_width = 3.0
+
 [connection signal="gui_input" from="TitleBar" to="." method="_on_title_bar_input"]
 [connection signal="pressed" from="TitleBar/ActionButtons/Maximise" to="." method="_on_size_pressed"]

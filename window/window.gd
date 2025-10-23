@@ -116,7 +116,9 @@ func _init() -> void:
 	minimise.pressed.connect(toggle_visibility)
 	buttons.add_child(minimise)
 	var maximise := TextureButton.new()
+	maximise.toggle_mode = true
 	maximise.texture_normal = preload("res://assets/maximise.svg")
+	maximise.texture_pressed = preload("res://assets/restore.svg")
 	maximise.pressed.connect(_on_size_pressed)
 	buttons.add_child(maximise)
 	var close := TextureButton.new()
@@ -129,9 +131,38 @@ func _init() -> void:
 	content.set_anchor(SIDE_RIGHT, 1.0)
 	content.set_anchor(SIDE_BOTTOM, 1.0)
 	content.set_anchor_and_offset(SIDE_TOP, 0.0, 32.0)
-	content.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	#content.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(content)
 	_maximise_button = maximise
+	
+	# These are needed to stop the GUI inputs for content going to the node instead of the resize handles 
+	var blockers := Control.new()
+	blockers.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
+	blockers.mouse_filter = MOUSE_FILTER_IGNORE
+	add_child(blockers)
+	
+	var left := ReferenceRect.new()
+	left.set_anchor(SIDE_BOTTOM, 1.0)
+	left.set_anchor_and_offset(SIDE_RIGHT, 0.0, 8.0)
+	blockers.add_child(left)
+	left.editor_only = false
+	left.mouse_filter = MOUSE_FILTER_PASS
+	left.gui_input.connect(_gui_input)
+	var right := ReferenceRect.new()
+	right.set_anchor(SIDE_BOTTOM, 1.0)
+	right.set_anchor(SIDE_RIGHT, 1.0)
+	right.set_anchor_and_offset(SIDE_LEFT, 1.0, -8.0)
+	blockers.add_child(right)
+	right.editor_only = false
+	right.mouse_filter = MOUSE_FILTER_PASS
+	right.gui_input.connect(_gui_input)
+	var bottom := ReferenceRect.new()
+	bottom.set_anchors_preset(PRESET_BOTTOM_WIDE)
+	bottom.set_anchor_and_offset(SIDE_TOP, 1.0, -8)
+	blockers.add_child(bottom)
+	bottom.editor_only = false
+	bottom.mouse_filter = MOUSE_FILTER_PASS
+	bottom.gui_input.connect(_gui_input)
 
 func _ready() -> void:
 	_handle = WindowManager.register_window(self)
@@ -195,7 +226,8 @@ func _on_title_bar_input(event: InputEvent) -> void:
 			if _mode in [ResizeMode.TOP, ResizeMode.TOP_LEFT, ResizeMode.TOP_RIGHT]:
 				_title_bar.set_default_cursor_shape(_get_cursor_for_mode(_mode))
 			else:
-				set_default_cursor_shape(Control.CURSOR_ARROW)
+				set_default_cursor_shape(CURSOR_ARROW)
+				_title_bar.set_default_cursor_shape(CURSOR_ARROW)
 
 func _gui_input(event: InputEvent):
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
