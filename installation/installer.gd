@@ -23,38 +23,39 @@ func _ready() -> void:
 		push_text("Initialising PotatoFS...")
 		dir.make_dir("potatofs")
 	
-	var new_version: String = await get_version()
-	if semver_greater(new_version, version):
-		update = true
-		push_text("Update available!")
-	
-	# Check hashes
-	var data: Dictionary = await get_data()
-	var files: Dictionary = data["files"]
-	for name in files.keys():
-		var path: String = "user://potatofs" + name
-		var file: Dictionary = files[name]
-		var hash: Array = file["hash"].split(":", true, 1)
-		var url: String = file["url"]
+	if true: # internet rn :)
+		var new_version: String = await get_version()
+		if semver_greater(new_version, version):
+			update = true
+			push_text("Update available!")
 		
-		if FileAccess.file_exists(path):
-			if hash_file(path, hash[0]) == hash[1]:
-				push_text("File valid: " + name)
+		# Check hashes
+		var data: Dictionary = await get_data()
+		var files: Dictionary = data["files"]
+		for name in files.keys():
+			var path: String = "user://potatofs" + name
+			var file: Dictionary = files[name]
+			var hash: Array = file["hash"].split(":", true, 1)
+			var url: String = file["url"]
+			
+			if FileAccess.file_exists(path):
+				if hash_file(path, hash[0]) == hash[1]:
+					push_text("File valid: " + name)
+				else:
+					push_text("Found invalid file: " + name)
+					await download_file(url, path)
+					if hash_file(path, hash[0]) == hash[1]:
+						push_text("File valid: " + name)
+					else:
+						push_text("File download unverified: " + name)
+						# now what?
 			else:
-				push_text("Found invalid file: " + name)
 				await download_file(url, path)
 				if hash_file(path, hash[0]) == hash[1]:
 					push_text("File valid: " + name)
 				else:
 					push_text("File download unverified: " + name)
-					# now what?
-		else:
-			await download_file(url, path)
-			if hash_file(path, hash[0]) == hash[1]:
-				push_text("File valid: " + name)
-			else:
-				push_text("File download unverified: " + name)
-				# what now?
+					# what now?
 	
 	for text in logs["log_sequence"]:
 		push_text(text["message"])

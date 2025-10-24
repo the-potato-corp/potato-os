@@ -23,6 +23,14 @@ var _resize_margin := 8
 var _restore_rect: Rect2 = Rect2()
 var _is_updating_button: bool = false
 
+var _paths: Dictionary = {
+	"icon": "/system/assets/icon.svg",
+	"minimise": "/system/assets/minimise.svg",
+	"maximise": "/system/assets/maximise.svg",
+	"restore": "/system/assets/restore.svg",
+	"close": "/system/assets/close.svg"
+}
+
 # Exposed
 var maximized: bool = false
 @export var rounded_corners: bool = true:
@@ -58,9 +66,9 @@ func toggle_size():
 		
 		maximized = true
 	
-	mouse_default_cursor_shape = Control.CURSOR_ARROW
+	mouse_default_cursor_shape = CURSOR_ARROW
 	
-	_title_bar.set_default_cursor_shape(Control.CURSOR_ARROW)
+	_title_bar.set_default_cursor_shape(CURSOR_ARROW)
 	
 	if _maximise_button:
 		_is_updating_button = true
@@ -75,6 +83,9 @@ func _close():
 	queue_free()
 
 # Internal
+func _load(path: String) -> Resource:
+	return load("user://potatofs".path_join(_paths[path]))
+
 func _init() -> void:
 	# self setup
 	mouse_filter = MOUSE_FILTER_PASS
@@ -101,7 +112,7 @@ func _init() -> void:
 	title_bar.add_child(info)
 	var icon := TextureRect.new()
 	icon.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
-	icon.texture = preload("res://assets/logo.svg")
+	icon.texture = _load("icon")
 	info.add_child(icon)
 	var title := Label.new()
 	title.text = "Untitled Window"
@@ -112,17 +123,15 @@ func _init() -> void:
 	buttons.alignment = BoxContainer.ALIGNMENT_END
 	title_bar.add_child(buttons)
 	var minimise := TextureButton.new()
-	minimise.texture_normal = preload("res://assets/minimise.svg")
+	minimise.texture_normal = _load("minimise")
 	minimise.pressed.connect(toggle_visibility)
 	buttons.add_child(minimise)
 	var maximise := TextureButton.new()
-	maximise.toggle_mode = true
-	maximise.texture_normal = preload("res://assets/maximise.svg")
-	maximise.texture_pressed = preload("res://assets/restore.svg")
+	maximise.texture_normal = _load("maximise")
 	maximise.pressed.connect(_on_size_pressed)
 	buttons.add_child(maximise)
 	var close := TextureButton.new()
-	close.texture_normal = preload("res://assets/close.svg")
+	close.texture_normal = _load("close")
 	close.pressed.connect(_close)
 	buttons.add_child(close)
 	
@@ -132,6 +141,7 @@ func _init() -> void:
 	content.set_anchor(SIDE_BOTTOM, 1.0)
 	content.set_anchor_and_offset(SIDE_TOP, 0.0, 32.0)
 	#content.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	content.gui_input.connect(_on_content_input)
 	add_child(content)
 	_maximise_button = maximise
 	
@@ -167,7 +177,12 @@ func _init() -> void:
 func _ready() -> void:
 	_handle = WindowManager.register_window(self)
 
-func _get_cursor_for_mode(mode: ResizeMode) -> Control.CursorShape:
+func _on_content_input(event: InputEvent) -> void:
+	if event is not InputEventMouseMotion:
+		pass
+		#print(event)
+
+func _get_cursor_for_mode(mode: ResizeMode) -> CursorShape:
 	match mode:
 		ResizeMode.LEFT, ResizeMode.RIGHT:
 			return Control.CURSOR_HSIZE
@@ -322,6 +337,7 @@ func _handle_resize(mouse_pos: Vector2):
 	global_position = _new_pos
 
 func _on_size_pressed() -> void:
+	_maximise_button.texture_normal = _load("restore") if maximized else _load("maximise")
 	if _is_updating_button:
 		return
 		
