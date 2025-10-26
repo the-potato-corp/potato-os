@@ -31,6 +31,10 @@ var _paths: Dictionary = {
 	"close": "/system/assets/close.svg"
 }
 
+signal activated
+signal focused
+signal focus_lost
+
 # Exposed
 var maximized: bool = false
 @export var rounded_corners: bool = true:
@@ -56,6 +60,10 @@ func toggle_size():
 		size = _restore_rect.size
 		clip_children = CLIP_CHILDREN_ONLY
 		maximized = false
+		
+		if _maximise_button:
+			_maximise_button.texture_normal = _load("maximise")
+			
 	else:
 		_restore_rect = Rect2(global_position, size)
 		
@@ -65,6 +73,10 @@ func toggle_size():
 		clip_children = CLIP_CHILDREN_DISABLED
 		
 		maximized = true
+		
+		if _maximise_button:
+			_maximise_button.texture_normal = _load("restore")
+			
 	
 	mouse_default_cursor_shape = CURSOR_ARROW
 	
@@ -84,11 +96,12 @@ func _close():
 
 # Internal
 func _load(path: String) -> Resource:
-	return load("user://potatofs".path_join(_paths[path]))
+	return ImageTexture.create_from_image(Image.load_from_file("user://potatofs".path_join(_paths[path])))
 
 func _init() -> void:
 	# self setup
 	mouse_filter = MOUSE_FILTER_PASS
+	focus_mode = FOCUS_ALL 
 	var panel := StyleBoxFlat.new() # this is used only as a mask
 	panel.set_corner_radius_all(8)
 	add_theme_stylebox_override("panel", panel)
@@ -136,18 +149,19 @@ func _init() -> void:
 	buttons.add_child(close)
 	
 	# content
-	var content := ColorRect.new()
+	var content := Control.new()
 	content.set_anchor(SIDE_RIGHT, 1.0)
 	content.set_anchor(SIDE_BOTTOM, 1.0)
 	content.set_anchor_and_offset(SIDE_TOP, 0.0, 32.0)
-	#content.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	content.gui_input.connect(_on_content_input)
+	content.mouse_filter = Control.MOUSE_FILTER_PASS
+	content.focus_mode = Control.FOCUS_NONE
 	add_child(content)
 	_maximise_button = maximise
 	
 	# These are needed to stop the GUI inputs for content going to the node instead of the resize handles 
-	var blockers := Control.new()
+	var blockers := ColorRect.new()
 	blockers.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
+	blockers.set_anchor_and_offset(SIDE_TOP, 0.0, 32.0)
 	blockers.mouse_filter = MOUSE_FILTER_IGNORE
 	add_child(blockers)
 	
@@ -155,7 +169,7 @@ func _init() -> void:
 	left.set_anchor(SIDE_BOTTOM, 1.0)
 	left.set_anchor_and_offset(SIDE_RIGHT, 0.0, 8.0)
 	blockers.add_child(left)
-	left.editor_only = false
+	#left.editor_only = false
 	left.mouse_filter = MOUSE_FILTER_PASS
 	left.gui_input.connect(_gui_input)
 	var right := ReferenceRect.new()
@@ -163,14 +177,14 @@ func _init() -> void:
 	right.set_anchor(SIDE_RIGHT, 1.0)
 	right.set_anchor_and_offset(SIDE_LEFT, 1.0, -8.0)
 	blockers.add_child(right)
-	right.editor_only = false
+	#right.editor_only = false
 	right.mouse_filter = MOUSE_FILTER_PASS
 	right.gui_input.connect(_gui_input)
 	var bottom := ReferenceRect.new()
 	bottom.set_anchors_preset(PRESET_BOTTOM_WIDE)
 	bottom.set_anchor_and_offset(SIDE_TOP, 1.0, -8)
 	blockers.add_child(bottom)
-	bottom.editor_only = false
+	#bottom.editor_only = false
 	bottom.mouse_filter = MOUSE_FILTER_PASS
 	bottom.gui_input.connect(_gui_input)
 
@@ -178,9 +192,8 @@ func _ready() -> void:
 	_handle = WindowManager.register_window(self)
 
 func _on_content_input(event: InputEvent) -> void:
-	if event is not InputEventMouseMotion:
-		pass
-		#print(event)
+	if event is InputEventMouseButton and event.pressed:
+		emit_signal("activated")
 
 func _get_cursor_for_mode(mode: ResizeMode) -> CursorShape:
 	match mode:
@@ -198,10 +211,12 @@ func _get_cursor_for_mode(mode: ResizeMode) -> CursorShape:
 func _on_title_bar_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.double_click and event.pressed:
+			emit_signal("activated")
 			toggle_size()
 			return
 			
 		if event.pressed:
+			emit_signal("activated")
 			if maximized:
 				return
 				
@@ -247,10 +262,11 @@ func _on_title_bar_input(event: InputEvent) -> void:
 func _gui_input(event: InputEvent):
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed:
+			emit_signal("activated")
 			if maximized:
 				return
 				
-			var _potential_resizing = _get_handle_resize(event.position)
+			var _potential_resizing = _get_handle_resize(get_local_mouse_position())
 			
 			if _potential_resizing != ResizeMode.NONE:
 				_resizing = _potential_resizing
@@ -271,7 +287,7 @@ func _gui_input(event: InputEvent):
 		if _resizing != ResizeMode.NONE:
 			_handle_resize(get_global_mouse_position())
 		else:
-			var _mode = _get_handle_resize(event.position)
+			var _mode = _get_handle_resize(get_local_mouse_position())
 			
 			if _mode != ResizeMode.NONE:
 				mouse_default_cursor_shape = _get_cursor_for_mode(_mode)
@@ -337,7 +353,6 @@ func _handle_resize(mouse_pos: Vector2):
 	global_position = _new_pos
 
 func _on_size_pressed() -> void:
-	_maximise_button.texture_normal = _load("restore") if maximized else _load("maximise")
 	if _is_updating_button:
 		return
 		
