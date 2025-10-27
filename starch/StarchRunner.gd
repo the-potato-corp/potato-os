@@ -1,4 +1,4 @@
-class_name StarchInstance
+class_name StarchRunner
 
 var location: String
 
@@ -15,6 +15,8 @@ func run() -> void:
 		print("Lex Error: %s" % lexer.get_error())
 	else:
 		var tokens: Array[Token] = lexer.get_tokens()
+		for token in tokens:
+			print(token.value)
 		# Parsing and eval here
 		var parser: Parser = Parser.new(tokens)
 		

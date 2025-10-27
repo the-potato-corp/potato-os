@@ -29,7 +29,7 @@ func _activate_window(window: OSWindow):
 	active_window.emit_signal("focused")
 	
 	# Z-order
-	active_window.get_parent().move_child(active_window, -1)
+	active_window.get_parent().move_child.call_deferred(active_window, -1)
 
 func _on_window_activated(window: OSWindow):
 	_activate_window(window)

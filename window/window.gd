@@ -94,6 +94,9 @@ func toggle_visibility():
 func get_content():
 	return _content
 
+func add_content(child):
+	_content.add_child(child)
+
 func _close():
 	WindowManager.unregister_window(_handle)
 	queue_free()

@@ -13,11 +13,15 @@ var last_error: EvalError = null
 var current_file_path: String = ""
 var loaded_modules: Dictionary = {}
 var modules: Dictionary = {}
+var allowed_modules: Array = []
 
 func _init() -> void:
 	global_env = EvalEnvironment.new()
 	current_env = global_env
 	setup_builtins()
+	print(FileAccess.get_file_as_string("user://potatofs/system/lib/gdmodules"))
+	for module in FileAccess.get_file_as_string("user://potatofs/system/lib/gdmodules").split("\n"):
+		allowed_modules.append(module)
 
 func set_file_path(path: String) -> void:
 	current_file_path = path
@@ -1281,7 +1285,7 @@ func resolve_module_path(module_name: String) -> String:
 			return path
 		elif FileAccess.file_exists(path + ".starch"):
 			return path + ".starch"
-		elif FileAccess.file_exists(path + ".gd"):
+		elif FileAccess.file_exists(path + ".gd") and module_name in allowed_modules:
 			return path + ".gd"
 	
 	return ""
@@ -1446,14 +1450,7 @@ func call_gdscript_method(gd_instance, method_name: String, args: Array):
 		return null
 	
 	# Args are already evaluated, so Callables are ready to use
-	match args.size():
-		0: return gd_instance.call(method_name)
-		1: return gd_instance.call(method_name, args[0])
-		2: return gd_instance.call(method_name, args[0], args[1])
-		3: return gd_instance.call(method_name, args[0], args[1], args[2])
-		4: return gd_instance.call(method_name, args[0], args[1], args[2], args[3])
-		5: return gd_instance.call(method_name, args[0], args[1], args[2], args[3], args[4])
-		_: return gd_instance.callv(method_name, args)
+	return gd_instance.callv(method_name, args)
 
 class StarchBoundMethod:
 	var instance: StarchInstance

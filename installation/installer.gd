@@ -1,7 +1,7 @@
 extends Node
 
 @export var main_scene: PackedScene
-var base_url: String = "http://potato-os.github.io"
+var base_url: String = "http://127.0.0.1:5500/" # dev
 var stream: String = "latest"
 var version: String = "v0.0.0"
 var update: bool = false
@@ -11,6 +11,11 @@ func push_text(text: String) -> void:
 	%Output.text += text + "\n"
 
 func _ready() -> void:
+	%Image.texture = ImageTexture.create_from_image(Image.load_from_file("user://potatofs/system/assets/icon.svg"))
+	var font = FontFile.new()
+	font.load_dynamic_font("user://potatofs/system/assets/font.ttf")
+	%Logo.add_theme_font_override("font", font)
+	
 	if FileAccess.file_exists("user://version"):
 		push_text("Finding version...")
 		version = FileAccess.get_file_as_string("user://version")
@@ -35,27 +40,11 @@ func _ready() -> void:
 		for name in files.keys():
 			var path: String = "user://potatofs" + name
 			var file: Dictionary = files[name]
-			var hash: Array = file["hash"].split(":", true, 1)
-			var url: String = file["url"]
+			var url: String = base_url.path_join(version + file["url"])
 			
-			if FileAccess.file_exists(path):
-				if hash_file(path, hash[0]) == hash[1]:
-					push_text("File valid: " + name)
-				else:
-					push_text("Found invalid file: " + name)
-					await download_file(url, path)
-					if hash_file(path, hash[0]) == hash[1]:
-						push_text("File valid: " + name)
-					else:
-						push_text("File download unverified: " + name)
-						# now what?
-			else:
+			if not FileAccess.file_exists(path):
 				await download_file(url, path)
-				if hash_file(path, hash[0]) == hash[1]:
-					push_text("File valid: " + name)
-				else:
-					push_text("File download unverified: " + name)
-					# what now?
+				push_text("Downloaded file: " + name)
 	
 	for text in logs["log_sequence"]:
 		push_text(text["message"])

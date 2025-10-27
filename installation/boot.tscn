@@ -1,9 +1,7 @@
-[gd_scene load_steps=6 format=3 uid="uid://dnpy061ln7mr6"]
+[gd_scene load_steps=4 format=3 uid="uid://dnpy061ln7mr6"]
 
 [ext_resource type="Script" uid="uid://dqfqg1iyap2cs" path="res://installation/installer.gd" id="1_ji48n"]
 [ext_resource type="PackedScene" uid="uid://disytg44ccvuw" path="res://etc/main.tscn" id="2_s2yil"]
-[ext_resource type="Texture2D" uid="uid://c6vvxptj3o1si" path="res://assets/logo.svg" id="3_s2yil"]
-[ext_resource type="FontFile" uid="uid://dcxmm3tyfxv4h" path="res://assets/font/JosefinSans-Regular.ttf" id="4_lbk54"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_s2yil"]
 bg_color = Color(0.19434926, 0.19434929, 0.19434917, 1)
@@ -44,15 +42,15 @@ offset_right = 211.0
 offset_bottom = 151.0
 grow_horizontal = 2
 
-[node name="TextureRect" type="TextureRect" parent="Control/Wordmark"]
+[node name="Image" type="TextureRect" parent="Control/Wordmark"]
+unique_name_in_owner = true
 layout_mode = 2
-texture = ExtResource("3_s2yil")
 
-[node name="Label" type="Label" parent="Control/Wordmark"]
+[node name="Logo" type="Label" parent="Control/Wordmark"]
+unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 1
 theme_override_colors/font_color = Color(1, 1, 1, 1)
-theme_override_fonts/font = ExtResource("4_lbk54")
 theme_override_font_sizes/font_size = 64
 text = "PotatoOS"
 vertical_alignment = 1

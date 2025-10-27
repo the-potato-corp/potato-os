@@ -15,7 +15,7 @@ run/main_scene="uid://dnpy061ln7mr6"
 config/use_custom_user_dir=true
 config/custom_user_dir_name="PotatoCorp/PotatoOS"
 config/features=PackedStringArray("4.5", "Forward Plus")
-config/icon="res://icon.svg"
+config/icon="uid://duc756nb8hook"
 
 [autoload]
 
