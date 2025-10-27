@@ -1,6 +1,6 @@
 [gd_scene load_steps=2 format=3 uid="uid://v4rthvt0o4xs"]
 
-[ext_resource type="Script" uid="uid://f4rhcuvg8j77" path="res://starch/sample_use.gd" id="1_poeds"]
+[ext_resource type="Script" uid="uid://f4rhcuvg8j77" path="res://starch/StarchInstance.gd" id="1_poeds"]
 
 [node name="STARCH" type="Node"]
 script = ExtResource("1_poeds")

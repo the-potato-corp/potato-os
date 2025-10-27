@@ -1,7 +1,7 @@
 [gd_scene load_steps=6 format=3 uid="uid://dnpy061ln7mr6"]
 
 [ext_resource type="Script" uid="uid://dqfqg1iyap2cs" path="res://installation/installer.gd" id="1_ji48n"]
-[ext_resource type="PackedScene" uid="uid://disytg44ccvuw" path="res://window/windowtest.tscn" id="2_s2yil"]
+[ext_resource type="PackedScene" uid="uid://disytg44ccvuw" path="res://etc/main.tscn" id="2_s2yil"]
 [ext_resource type="Texture2D" uid="uid://c6vvxptj3o1si" path="res://assets/logo.svg" id="3_s2yil"]
 [ext_resource type="FontFile" uid="uid://dcxmm3tyfxv4h" path="res://assets/font/JosefinSans-Regular.ttf" id="4_lbk54"]
 

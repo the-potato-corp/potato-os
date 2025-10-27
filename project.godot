@@ -21,7 +21,11 @@ config/icon="res://icon.svg"
 
 StarchRuntime="*res://starch/StarchRuntime.gd"
 WindowManager="*res://window/WindowManager.gd"
-InputManager="*res://input/InputManager.gd"
+InputManager="*res://etc/InputManager.gd"
+
+[display]
+
+window/size/mode=4
 
 [editor]
 
@@ -30,8 +34,7 @@ movie_writer/movie_file="C:/Users/250055/Documents/Godot/potato-os/recording.ogv
 [file_customization]
 
 folder_colors={
-"res://assets/": "blue",
-"res://input/": "red",
+"res://etc/": "red",
 "res://installation/": "green",
 "res://starch/": "yellow",
 "res://window/": "gray"

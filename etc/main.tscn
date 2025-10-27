@@ -1,0 +1,22 @@
+[gd_scene load_steps=3 format=3 uid="uid://disytg44ccvuw"]
+
+[ext_resource type="Script" uid="uid://cgd4nvbqxd6bk" path="res://window/window.gd" id="1_c3cej"]
+[ext_resource type="Script" uid="uid://5x28w5co243t" path="res://etc/main.gd" id="1_i7s0b"]
+
+[node name="Main" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_i7s0b")
+
+[node name="OSWindow" type="Panel" parent="."]
+layout_mode = 0
+offset_left = 206.0
+offset_top = 88.0
+offset_right = 577.0
+offset_bottom = 329.0
+script = ExtResource("1_c3cej")
+metadata/_custom_type_script = "uid://cgd4nvbqxd6bk"

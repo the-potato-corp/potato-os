@@ -6,6 +6,7 @@ var _handle: int
 var _dragging: bool = false
 var _drag_offset: Vector2 = Vector2()
 var _title_bar: Control
+var _content: Control
 
 enum ResizeMode {
 	NONE,
@@ -90,6 +91,9 @@ func toggle_size():
 func toggle_visibility():
 	visible = not visible
 
+func get_content():
+	return _content
+
 func _close():
 	WindowManager.unregister_window(_handle)
 	queue_free()
@@ -153,10 +157,11 @@ func _init() -> void:
 	content.set_anchor(SIDE_RIGHT, 1.0)
 	content.set_anchor(SIDE_BOTTOM, 1.0)
 	content.set_anchor_and_offset(SIDE_TOP, 0.0, 32.0)
-	content.mouse_filter = Control.MOUSE_FILTER_PASS
-	content.focus_mode = Control.FOCUS_NONE
+	content.mouse_filter = Control.MOUSE_FILTER_STOP
+	content.focus_mode = Control.FOCUS_ALL
 	add_child(content)
 	_maximise_button = maximise
+	_content = content
 	
 	# These are needed to stop the GUI inputs for content going to the node instead of the resize handles 
 	var blockers := ColorRect.new()
@@ -190,10 +195,29 @@ func _init() -> void:
 
 func _ready() -> void:
 	_handle = WindowManager.register_window(self)
+	focused.connect(_on_window_focused)
+
+func _on_window_focused() -> void:
+	if _content:
+		_content.grab_focus()
 
 func _on_content_input(event: InputEvent) -> void:
-	if event is InputEventMouseButton and event.pressed:
-		emit_signal("activated")
+	if WindowManager.focused_window != self:
+		return
+	
+	if event is InputEventKey:
+		_propagate_input_to_children(event)
+	elif event is InputEventMouseButton:
+		if event.pressed:
+			emit_signal("activated")
+		_propagate_input_to_children(event)
+	elif event is InputEventMouseMotion:
+		_propagate_input_to_children(event)
+
+func _propagate_input_to_children(event: InputEvent) -> void:
+	for child in _content.get_children():
+		if child.has_method("_gui_input"):
+			child._gui_input(event)
 
 func _get_cursor_for_mode(mode: ResizeMode) -> CursorShape:
 	match mode:
