@@ -3,6 +3,14 @@ extends Node
 var windows: Dictionary = {}
 var _next_handle: int = 1
 var active_window: OSWindow = null
+var _root: Node
+
+# HAHAHAHA L BOZO IMAGINE EXISTING
+# I'm going mad...
+# TODO exist
+
+func get_root():
+	return _root
 
 func register_window(window: OSWindow) -> int:
 	var handle = _next_handle

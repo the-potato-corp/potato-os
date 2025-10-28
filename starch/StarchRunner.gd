@@ -7,6 +7,7 @@ func _init(location: String) -> void:
 
 func run() -> void:
 	var code: String = FileAccess.get_file_as_string(location)
+	code = code.replace("\r\n", "\n") # I FRICKING HATE UNIX/WINDOWS DIFFERENCES GOD THIS TOOK LITERAL HOURS TO RESOLVE
 	
 	var lexer: Lexer = Lexer.new(code)
 	var error: Error = lexer.lex()
