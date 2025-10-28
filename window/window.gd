@@ -95,8 +95,10 @@ func get_content():
 	return _content
 
 func add_content(child):
-	print("Adding?")
+	print(_content)
+	print(child)
 	_content.add_child(child)
+	print(_content.get_children())
 
 func _close():
 	WindowManager.unregister_window(_handle)
@@ -196,6 +198,10 @@ func _init() -> void:
 	#bottom.editor_only = false
 	bottom.mouse_filter = MOUSE_FILTER_PASS
 	bottom.gui_input.connect(_gui_input)
+	left.z_index = 1000
+	right.z_index = 1000
+	bottom.z_index = 1000
+	content.z_index = 1
 
 func _ready() -> void:
 	_handle = WindowManager.register_window(self)

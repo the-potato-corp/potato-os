@@ -46,13 +46,14 @@ func _ready() -> void:
 				await download_file(url, path)
 				push_text("Downloaded file: " + name)
 	
-	for text in logs["log_sequence"]:
-		push_text(text["message"])
-		await get_tree().create_timer(randf_range(0.01, 0.2)).timeout
-	
-	await get_tree().create_timer(0.8).timeout
-	push_text("\nWelcome, user.")
-	await get_tree().create_timer(2).timeout
+	if false: # in a rush rn
+		for text in logs["log_sequence"]:
+			push_text(text["message"])
+			await get_tree().create_timer(randf_range(0.01, 0.2)).timeout
+		
+		await get_tree().create_timer(0.8).timeout
+		push_text("\nWelcome, user.")
+		await get_tree().create_timer(2).timeout
 	
 	get_tree().change_scene_to_packed(main_scene)
 
