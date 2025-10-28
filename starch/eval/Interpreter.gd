@@ -267,6 +267,12 @@ func eval(node: ASTNode):
 
 func eval_var_declaration(node: ASTVarDeclaration):
 	var value = eval(node.value) if node.value else null
+	
+	# DEBUG
+	print("DEBUG var decl: ", node.name, " = ", typeof(value), ", is wrapper? ", value is GDScriptInstanceWrapper)
+	if value is GDScriptInstanceWrapper:
+		print("  Wrapper contains: ", value.gd_instance.get_class())
+	
 	if had_error:
 		return null
 	
@@ -367,6 +373,7 @@ func eval_function_call(node: ASTFunctionCall):
 	elif callee is ASTMemberAccess:
 		# First evaluate to see what we're dealing with
 		var func_or_obj = eval(callee)
+		print("DEBUG eval_function_call: func_or_obj type = ", typeof(func_or_obj), ", is Callable? ", func_or_obj is Callable)
 		if had_error:
 			return null
 		
@@ -379,7 +386,9 @@ func eval_function_call(node: ASTFunctionCall):
 		
 		# If it's a callable (function from module or builtin), just call it
 		if func_or_obj is Callable:
-			return func_or_obj.call(args)
+			var result = func_or_obj.call(args)
+			print("DEBUG: Callable returned type = ", typeof(result), ", is wrapper? ", result is GDScriptInstanceWrapper)
+			return result
 		
 		# If it's a user function definition, call it
 		if func_or_obj is ASTFunctionDeclaration:
@@ -832,9 +841,13 @@ func eval_member_access(node: ASTMemberAccess):
 		elif obj.module_data.classes.has(member_name):
 			var class_def = obj.module_data.classes[member_name]
 			
-			# PATCH: Delegate class constructor based on type (Starch or GDScript)
+			print("DEBUG: class_def type = ", typeof(class_def))
+			print("DEBUG: class_def is GDScript? ", class_def is GDScript)
+			print("DEBUG: class_def = ", class_def)
+			
 			if class_def is GDScript:
 				return func(args):
+					print("DEBUG: LAMBDA CALLED")  # <-- ADD THIS
 					return instantiate_gdscript_class(class_def, args)
 			elif class_def is ASTClassDeclaration:
 				return func(args):
@@ -845,7 +858,11 @@ func eval_member_access(node: ASTMemberAccess):
 			return null
 	
 	# PATCH START: Handle GDScript instance member access
+	# gng istg if this doesnt work ima die
+	print("DEBUG member access: obj type = ", typeof(obj), ", is wrapper? ", obj is GDScriptInstanceWrapper)
 	if obj is GDScriptInstanceWrapper:
+		print("  Wrapped instance class: ", obj.gd_instance.get_class())
+		print("  Has method 'add_content'? ", obj.gd_instance.has_method("add_content"))
 		var gd_instance = obj.gd_instance
 		
 		# 1. Check for methods
@@ -1431,18 +1448,22 @@ func load_gdscript_module(module_path: String) -> bool:
 	return true
 
 func instantiate_gdscript_class(class_script: GDScript, args: Array):
+	print("DEBUG instantiate_gdscript_class: Starting")
 	var instance = class_script.new()
 	if not instance:
 		raise_error(EvalError.new(EvalError.RUNTIME_ERROR, "Failed to instantiate GDScript class"))
 		return null
 	
-	# Check for a starch_init method for custom initialisation
-	# PATCH: Use callv to pass arguments correctly
+	print("DEBUG: Created instance of type: ", instance.get_class())
+	
 	if instance.has_method("starch_init"):
 		instance.callv("starch_init", args)
-	# PATCH END
 	
-	return GDScriptInstanceWrapper.new(instance)
+	var wrapper = GDScriptInstanceWrapper.new(instance)
+	print("DEBUG: Created wrapper, is wrapper? ", wrapper is GDScriptInstanceWrapper)
+	print("DEBUG: Wrapper type = ", typeof(wrapper))
+	
+	return wrapper
 
 func call_gdscript_method(gd_instance, method_name: String, args: Array):
 	if not gd_instance.has_method(method_name):

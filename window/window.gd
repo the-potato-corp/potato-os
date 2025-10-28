@@ -95,6 +95,7 @@ func get_content():
 	return _content
 
 func add_content(child):
+	print("Adding?")
 	_content.add_child(child)
 
 func _close():
