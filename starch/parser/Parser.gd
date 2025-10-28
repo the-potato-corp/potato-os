@@ -43,7 +43,7 @@ func parse() -> Error:
 	var program: Program = Program.new([])
 	
 	while current_token != null and current_token.type != "EOF":
-		print("DEBUG: About to parse statement, current token: ", current_token.type if current_token else "NULL", " = ", current_token.value if current_token else "")
+		#print("DEBUG: About to parse statement, current token: ", current_token.type if current_token else "NULL", " = ", current_token.value if current_token else "")
 		var statement: ASTNode = parse_statement()
 		if statement:
 			program.statements.append(statement)

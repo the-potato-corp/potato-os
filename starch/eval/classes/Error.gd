@@ -11,7 +11,8 @@ enum {
 	RUNTIME_ERROR,
 	ATTRIBUTE_ERROR,
 	INDEX_ERROR,
-	KEY_ERROR
+	KEY_ERROR,
+	NULL_ERROR
 }
 
 func _init(type: int, message: String) -> void:

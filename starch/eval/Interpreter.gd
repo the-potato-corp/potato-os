@@ -19,7 +19,7 @@ func _init() -> void:
 	global_env = EvalEnvironment.new()
 	current_env = global_env
 	setup_builtins()
-	print(FileAccess.get_file_as_string("user://potatofs/system/lib/gdmodules"))
+	#print(FileAccess.get_file_as_string("user://potatofs/system/lib/gdmodules"))
 	for module in FileAccess.get_file_as_string("user://potatofs/system/lib/gdmodules").split("\n"):
 		allowed_modules.append(module)
 
@@ -167,9 +167,9 @@ func eval(node: ASTNode):
 		"ASTIdentifier":
 			# Check if it's a module name
 			if modules.has(node.name):
-				return ModuleProxy.new(node.name, modules[node.name])
+				return modules[node.name]
 			
-			# Check if it's a function
+			# Check if it's aDE function
 			if functions.has(node.name):
 				var func_def = functions[node.name]
 				# If it's already a callable (builtin), return it
@@ -269,9 +269,9 @@ func eval_var_declaration(node: ASTVarDeclaration):
 	var value = eval(node.value) if node.value else null
 	
 	# DEBUG
-	print("DEBUG var decl: ", node.name, " = ", typeof(value), ", is wrapper? ", value is GDScriptInstanceWrapper)
+	#print("DEBUG var decl: ", node.name, " = ", typeof(value), ", is wrapper? ", value is GDScriptInstanceWrapper)
 	if value is GDScriptInstanceWrapper:
-		print("  Wrapper contains: ", value.gd_instance.get_class())
+		pass#print("  Wrapper contains: ", value.gd_instance.get_class())
 	
 	if had_error:
 		return null
@@ -373,7 +373,7 @@ func eval_function_call(node: ASTFunctionCall):
 	elif callee is ASTMemberAccess:
 		# First evaluate to see what we're dealing with
 		var func_or_obj = eval(callee)
-		print("DEBUG eval_function_call: func_or_obj type = ", typeof(func_or_obj), ", is Callable? ", func_or_obj is Callable)
+		#print("DEBUG eval_function_call: func_or_obj type = ", typeof(func_or_obj), ", is Callable? ", func_or_obj is Callable)
 		if had_error:
 			return null
 		
@@ -387,7 +387,7 @@ func eval_function_call(node: ASTFunctionCall):
 		# If it's a callable (function from module or builtin), just call it
 		if func_or_obj is Callable:
 			var result = func_or_obj.call(args)
-			print("DEBUG: Callable returned type = ", typeof(result), ", is wrapper? ", result is GDScriptInstanceWrapper)
+			#print("DEBUG: Callable returned type = ", typeof(result), ", is wrapper? ", result is GDScriptInstanceWrapper)
 			return result
 		
 		# If it's a user function definition, call it
@@ -829,89 +829,51 @@ func eval_dict_literal(node: ASTDictLiteral) -> Dictionary:
 
 func eval_member_access(node: ASTMemberAccess):
 	var obj = eval(node.object)
+	
 	if had_error:
 		return null
 	
+	# Handle cases where the object is null
+	if obj == null:
+		raise_error(EvalError.new(EvalError.NULL_ERROR, "Cannot access member of a null value."))
+		return null
+
 	var member_name = node.member
-	
-	# Handle module member access
+
+	# 1. Handle ModuleProxy by dispatching to its _get method
 	if obj is ModuleProxy:
-		if obj.module_data.functions.has(member_name):
-			return obj.module_data.functions[member_name]
-		elif obj.module_data.classes.has(member_name):
-			var class_def = obj.module_data.classes[member_name]
-			
-			print("DEBUG: class_def type = ", typeof(class_def))
-			print("DEBUG: class_def is GDScript? ", class_def is GDScript)
-			print("DEBUG: class_def = ", class_def)
-			
-			if class_def is GDScript:
-				return func(args):
-					print("DEBUG: LAMBDA CALLED")  # <-- ADD THIS
-					return instantiate_gdscript_class(class_def, args)
-			elif class_def is ASTClassDeclaration:
-				return func(args):
-					return instantiate_class_from_module(obj.module_data, member_name, args)
-			# END PATCH
-		else:
-			raise_error(EvalError.new(EvalError.ATTRIBUTE_ERROR, "Module '%s' has no attribute '%s'" % [obj.name, member_name]))
-			return null
+		return obj._get(member_name)
 	
-	# PATCH START: Handle GDScript instance member access
-	# gng istg if this doesnt work ima die
-	print("DEBUG member access: obj type = ", typeof(obj), ", is wrapper? ", obj is GDScriptInstanceWrapper)
+	# 2. Handle GDScriptInstanceWrapper by dispatching to its _get method
 	if obj is GDScriptInstanceWrapper:
-		print("  Wrapped instance class: ", obj.gd_instance.get_class())
-		print("  Has method 'add_content'? ", obj.gd_instance.has_method("add_content"))
-		var gd_instance = obj.gd_instance
-		
-		# 1. Check for methods
-		if gd_instance.has_method(member_name):
-			# Return a callable that binds the instance to the method
-			return func(args):
-				var result = gd_instance.callv(member_name, args)
-				return result
-		
-		# 2. Check for properties (using .get() for dynamic properties)
-		var value = gd_instance.get(member_name)
-		
-		# Check if we successfully accessed an existing property/variable
-		if value != null || gd_instance.get_property_list().any(func(prop): return prop.name == member_name) || member_name in gd_instance:
-			return value
-		
-		# 3. Fallback for built-in methods on internal types
-		var method_result = call_method(gd_instance, member_name, [])
-		if not had_error:
-			return method_result
-		
-		if had_error: return null 
-	# PATCH END
-	
-	# Normal Starch instance member access
+		return obj._get(member_name)
+
+	# 3. Handle StarchInstance (your existing logic)
 	if obj is StarchInstance:
 		if obj.env.has(member_name):
 			return obj.env.get_var(member_name)
 		elif obj.methods.has(member_name):
-			# Return a bound method proxy
 			return StarchBoundMethod.new(obj, member_name)
 		else:
 			raise_error(EvalError.new(EvalError.ATTRIBUTE_ERROR, "Instance of '%s' has no attribute '%s'" % [obj.name_class, member_name]))
 			return null
 	
+	# 4. Handle Dictionaries (your existing logic)
 	if typeof(obj) == TYPE_DICTIONARY:
 		if member_name in obj:
 			return obj[member_name]
 		else:
 			raise_error(EvalError.new(EvalError.KEY_ERROR, "Key '%s' not found in dictionary" % member_name))
 			return null
-	else:
-		# Fallback for built-in methods on native types
-		var method_result = call_method(obj, member_name, [])
-		if had_error:
-			return null
-		
-		raise_error(EvalError.new(EvalError.ATTRIBUTE_ERROR, "Cannot access property '%s' on type %s" % [member_name, type_string(typeof(obj))]))
-		return null
+	
+	# 5. Fallback for built-in methods on native Godot types (your existing logic)
+	var method_result = call_method(obj, member_name, [])
+	if not had_error:
+		return method_result
+	
+	# If none of the above worked, the attribute does not exist.
+	raise_error(EvalError.new(EvalError.ATTRIBUTE_ERROR, "Cannot access property '%s' on type %s" % [member_name, type_string(typeof(obj))]))
+	return null
 
 func eval_index_access(node: ASTIndexAccess):
 	var obj = eval(node.object)
@@ -1179,13 +1141,14 @@ func eval_using(node: ASTUsingStatement):
 		raise_error(EvalError.new(EvalError.NAME_ERROR, "Module '%s' not found" % module_name))
 		return null
 	
-	# Load the module if not already loaded
 	if not loaded_modules.has(module_path):
 		if not load_module(module_path):
 			return null
 	
-	# Store module reference (for namespaced access)
-	modules[module_name] = loaded_modules[module_path]
+	# Create proxy with interpreter reference
+	var proxy = ModuleProxy.new(module_name, loaded_modules[module_path])
+	proxy.interpreter_ref = self  # ADD THIS
+	modules[module_name] = proxy
 	
 	return null
 
@@ -1448,20 +1411,25 @@ func load_gdscript_module(module_path: String) -> bool:
 	return true
 
 func instantiate_gdscript_class(class_script: GDScript, args: Array):
-	print("DEBUG instantiate_gdscript_class: Starting")
-	var instance = class_script.new()
+	#print("DEBUG instantiate_gdscript_class: Starting with args: ", args)
+	
+	# Create instance - this calls _init automatically if it exists
+	var instance
+	if args.size() > 0:
+		# Use callv to pass args to _init
+		instance = class_script.callv("new", args)
+	else:
+		instance = class_script.new()
+	
 	if not instance:
 		raise_error(EvalError.new(EvalError.RUNTIME_ERROR, "Failed to instantiate GDScript class"))
 		return null
 	
-	print("DEBUG: Created instance of type: ", instance.get_class())
+	#print("DEBUG: Created instance of type: ", instance.get_class())
 	
-	if instance.has_method("starch_init"):
-		instance.callv("starch_init", args)
-	
+	# Wrap it
 	var wrapper = GDScriptInstanceWrapper.new(instance)
-	print("DEBUG: Created wrapper, is wrapper? ", wrapper is GDScriptInstanceWrapper)
-	print("DEBUG: Wrapper type = ", typeof(wrapper))
+	#print("DEBUG: Created wrapper")
 	
 	return wrapper
 
@@ -1483,9 +1451,41 @@ class StarchBoundMethod:
 
 class GDScriptInstanceWrapper:
 	var gd_instance: Object
+	var _method_remap: Dictionary = {}
 	
 	func _init(instance):
 		gd_instance = instance
+		
+		# Check if the instance has a _methods dictionary for remapping
+		if "_methods" in gd_instance:
+			_method_remap = gd_instance._methods
+	
+	func _get(property):
+		# Check if this property should be remapped
+		var actual_property = property
+		if _method_remap.has(property):
+			var remap_target = _method_remap[property]
+			
+			# If it's a string, it's a method/property name to call
+			if typeof(remap_target) == TYPE_STRING:
+				actual_property = remap_target
+			# If it's a Callable/FuncRef, call it directly
+			elif remap_target is Callable:
+				return func(args):
+					return remap_target.callv(args)
+		
+		# Check if it's a method
+		if gd_instance.has_method(actual_property):
+			# Return a bound callable
+			return func(args):
+				return gd_instance.callv(actual_property, args)
+		
+		# Check if it's a property
+		if actual_property in gd_instance:
+			return gd_instance.get(actual_property)
+		
+		push_warning("GDScriptInstanceWrapper: Property '%s' not found" % property)
+		return null
 	
 	func _to_string() -> String:
 		if gd_instance.has_method("_to_string"):
@@ -1512,3 +1512,27 @@ class ModuleProxy:
 	func _init(n: String, data: Dictionary):
 		name = n
 		module_data = data
+	
+	func _get(property):
+		# Check if it's a function
+		if module_data.functions.has(property):
+			return module_data.functions[property]
+		
+		# Check if it's a class - return a constructor function
+		if module_data.classes.has(property):
+			var class_script = module_data.classes[property]
+			# Return a callable that instantiates the class
+			return func(args):
+				return _instantiate_class(class_script, args)
+		
+		push_warning("ModuleProxy: Property '%s' not found in module '%s'" % [property, name])
+		return null
+	
+	func _instantiate_class(class_script: GDScript, args: Array):
+		# This needs to call back into the interpreter's instantiation logic
+		# We'll need to pass a reference to the interpreter
+		if interpreter_ref:
+			return interpreter_ref.instantiate_gdscript_class(class_script, args)
+		return null
+	
+	var interpreter_ref  # Add this reference when creating ModuleProxy
