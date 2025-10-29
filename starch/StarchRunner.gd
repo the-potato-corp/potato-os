@@ -27,6 +27,8 @@ func run() -> void:
 			print("Parse Error: %s" % parser.get_error())
 		else:
 			var program: Program = parser.get_program()
+			for s in program.statements:
+				print(s.serialise())
 			
 			var interpreter: Interpreter = Interpreter.new()
 			interpreter.set_file_path("res://starch/main.starch")

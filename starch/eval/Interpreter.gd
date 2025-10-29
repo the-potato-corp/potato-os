@@ -269,9 +269,9 @@ func eval_var_declaration(node: ASTVarDeclaration):
 	var value = eval(node.value) if node.value else null
 	
 	# DEBUG
-	#print("DEBUG var decl: ", node.name, " = ", typeof(value), ", is wrapper? ", value is GDScriptInstanceWrapper)
+	print("DEBUG var decl: ", node.name, " = ", typeof(value), ", is wrapper? ", value is GDScriptInstanceWrapper)
 	if value is GDScriptInstanceWrapper:
-		pass#print("  Wrapper contains: ", value.gd_instance.get_class())
+		print("  Wrapper contains: ", value.gd_instance.get_class())
 	
 	if had_error:
 		return null
@@ -386,8 +386,9 @@ func eval_function_call(node: ASTFunctionCall):
 		
 		# If it's a callable (function from module or builtin), just call it
 		if func_or_obj is Callable:
+			print("DEBUG: Calling with args = ", args)
 			var result = func_or_obj.call(args)
-			#print("DEBUG: Callable returned type = ", typeof(result), ", is wrapper? ", result is GDScriptInstanceWrapper)
+			print("DEBUG: Result = ", result)
 			return result
 		
 		# If it's a user function definition, call it
@@ -829,6 +830,8 @@ func eval_dict_literal(node: ASTDictLiteral) -> Dictionary:
 
 func eval_member_access(node: ASTMemberAccess):
 	var obj = eval(node.object)
+	print("DEBUG member access: obj type = ", typeof(obj), ", is wrapper? ", obj is GDScriptInstanceWrapper)
+	print("  Looking for member: ", node.member)
 	
 	if had_error:
 		return null
@@ -846,7 +849,10 @@ func eval_member_access(node: ASTMemberAccess):
 	
 	# 2. Handle GDScriptInstanceWrapper by dispatching to its _get method
 	if obj is GDScriptInstanceWrapper:
-		return obj._get(member_name)
+		print("  Calling obj._get(", member_name, ")")
+		var result = obj._get(member_name)
+		print("  Result: ", result, ", type: ", typeof(result))
+		return result
 
 	# 3. Handle StarchInstance (your existing logic)
 	if obj is StarchInstance:
@@ -1474,11 +1480,11 @@ class GDScriptInstanceWrapper:
 				return func(args):
 					return remap_target.callv(args)
 		
-		# Check if it's a method
+		# In GDScriptInstanceWrapper._get:
 		if gd_instance.has_method(actual_property):
 			# Return a bound callable
-			return func(args):
-				return gd_instance.callv(actual_property, args)
+			return func(args_array):  # <- Single parameter that IS the array
+				return gd_instance.callv(actual_property, args_array)
 		
 		# Check if it's a property
 		if actual_property in gd_instance:

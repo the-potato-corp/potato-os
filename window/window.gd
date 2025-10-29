@@ -95,9 +95,9 @@ func get_content():
 	return _content
 
 func add_content(child):
-	print(_content)
-	print(child)
+	print("adding content to window")
 	_content.add_child(child)
+	print(child)
 	print(_content.get_children())
 
 func _close():
