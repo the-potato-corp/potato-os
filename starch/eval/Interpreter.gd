@@ -1467,26 +1467,36 @@ class GDScriptInstanceWrapper:
 			_method_remap = gd_instance._methods
 	
 	func _get(property):
-		# Check if this property should be remapped
+		print("    _GET CALLED FOR: ", property)
 		var actual_property = property
+		var wrapper_ref = self  # Capture wrapper reference at the start
+		
 		if _method_remap.has(property):
 			var remap_target = _method_remap[property]
 			
-			# If it's a string, it's a method/property name to call
 			if typeof(remap_target) == TYPE_STRING:
 				actual_property = remap_target
-			# If it's a Callable/FuncRef, call it directly
 			elif remap_target is Callable:
 				return func(args):
-					return remap_target.callv(args)
+					print("      CALLABLE LAMBDA EXECUTING")
+					var result = remap_target.callv(args)
+					print("      Result: ", result)
+					print("      Result ID: ", result.get_instance_id() if result != null else "null")
+					print("      gd_instance ID: ", wrapper_ref.gd_instance.get_instance_id())
+					# If result is self (builder pattern), return wrapper
+					if result != null and result.get_instance_id() == wrapper_ref.gd_instance.get_instance_id():
+						print("      IDs MATCH! Returning wrapper")
+						return wrapper_ref
+					print("      IDs don't match, returning raw result")
+					return result
 		
-		# In GDScriptInstanceWrapper._get:
 		if gd_instance.has_method(actual_property):
-			# Return a bound callable
-			return func(args_array):  # <- Single parameter that IS the array
-				return gd_instance.callv(actual_property, args_array)
+			return func(args):
+				var result = gd_instance.callv(actual_property, args)
+				if result != null and result.get_instance_id() == wrapper_ref.gd_instance.get_instance_id():
+					return wrapper_ref
+				return result
 		
-		# Check if it's a property
 		if actual_property in gd_instance:
 			return gd_instance.get(actual_property)
 		
