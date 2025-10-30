@@ -20,8 +20,10 @@ func _init() -> void:
 	current_env = global_env
 	setup_builtins()
 	#print(FileAccess.get_file_as_string("user://potatofs/system/lib/gdmodules"))
-	for module in FileAccess.get_file_as_string("user://potatofs/system/lib/gdmodules").split("\n"):
+	for module in FileAccess.get_file_as_string("user://potatofs/system/lib/gdmodules").replace("\r", "").split("\n"):
+		#print(module)
 		allowed_modules.append(module)
+	print(allowed_modules)
 
 func set_file_path(path: String) -> void:
 	current_file_path = path
@@ -1273,8 +1275,11 @@ func resolve_module_path(module_name: String) -> String:
 			return path
 		elif FileAccess.file_exists(path + ".starch"):
 			return path + ".starch"
-		elif FileAccess.file_exists(path + ".gd") and module_name in allowed_modules:
-			return path + ".gd"
+		elif FileAccess.file_exists(path + ".gd"):
+			if module_name in allowed_modules:
+				return path + ".gd"
+			else:
+				print("Module is not whitelisted")
 	
 	return ""
 
