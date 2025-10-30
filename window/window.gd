@@ -95,7 +95,7 @@ func get_content():
 	return _content
 
 func add_content(child):
-	print("adding content to window")
+	print("ADDING CONTENT (FROM ENGIME)")
 	_content.add_child(child)
 	print(child)
 	print(_content.get_children())

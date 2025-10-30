@@ -182,7 +182,9 @@ func eval(node: ASTNode):
 			if not current_env.has(node.name):
 				raise_error(EvalError.new(EvalError.NAME_ERROR, "name '%s' is not defined" % node.name))
 				return null
-			return current_env.get_var(node.name)
+			var result = current_env.get_var(node.name)
+			print("DEBUG Identifier '", node.name, "' = ", result, ", is wrapper? ", result is GDScriptInstanceWrapper)
+			return result
 		
 		"ASTFunctionCall":
 			return eval_function_call(node)
@@ -1446,109 +1448,3 @@ func call_gdscript_method(gd_instance, method_name: String, args: Array):
 	
 	# Args are already evaluated, so Callables are ready to use
 	return gd_instance.callv(method_name, args)
-
-class StarchBoundMethod:
-	var instance: StarchInstance
-	var method_name: String
-	
-	func _init(inst, name):
-		instance = inst
-		method_name = name
-
-class GDScriptInstanceWrapper:
-	var gd_instance: Object
-	var _method_remap: Dictionary = {}
-	
-	func _init(instance):
-		gd_instance = instance
-		
-		# Check if the instance has a _methods dictionary for remapping
-		if "_methods" in gd_instance:
-			_method_remap = gd_instance._methods
-	
-	func _get(property):
-		print("    _GET CALLED FOR: ", property)
-		var actual_property = property
-		var wrapper_ref = self  # Capture wrapper reference at the start
-		
-		if _method_remap.has(property):
-			var remap_target = _method_remap[property]
-			
-			if typeof(remap_target) == TYPE_STRING:
-				actual_property = remap_target
-			elif remap_target is Callable:
-				return func(args):
-					print("      CALLABLE LAMBDA EXECUTING")
-					var result = remap_target.callv(args)
-					print("      Result: ", result)
-					print("      Result ID: ", result.get_instance_id() if result != null else "null")
-					print("      gd_instance ID: ", wrapper_ref.gd_instance.get_instance_id())
-					# If result is self (builder pattern), return wrapper
-					if result != null and result.get_instance_id() == wrapper_ref.gd_instance.get_instance_id():
-						print("      IDs MATCH! Returning wrapper")
-						return wrapper_ref
-					print("      IDs don't match, returning raw result")
-					return result
-		
-		if gd_instance.has_method(actual_property):
-			return func(args):
-				var result = gd_instance.callv(actual_property, args)
-				if result != null and result.get_instance_id() == wrapper_ref.gd_instance.get_instance_id():
-					return wrapper_ref
-				return result
-		
-		if actual_property in gd_instance:
-			return gd_instance.get(actual_property)
-		
-		push_warning("GDScriptInstanceWrapper: Property '%s' not found" % property)
-		return null
-	
-	func _to_string() -> String:
-		if gd_instance.has_method("_to_string"):
-			return gd_instance._to_string()
-		return "<GDScript instance of %s>" % gd_instance.get_class()
-
-class StarchInstance:
-	var name_class: String
-	var class_def: ASTClassDeclaration
-	var methods: Dictionary = {}
-	var env: EvalEnvironment
-	
-	func _init(name: String, def_node: ASTClassDeclaration):
-		name_class = name
-		class_def = def_node
-	
-	func _to_string() -> String:
-		return "<instance of %s>" % name_class
-
-class ModuleProxy:
-	var name: String
-	var module_data: Dictionary
-	
-	func _init(n: String, data: Dictionary):
-		name = n
-		module_data = data
-	
-	func _get(property):
-		# Check if it's a function
-		if module_data.functions.has(property):
-			return module_data.functions[property]
-		
-		# Check if it's a class - return a constructor function
-		if module_data.classes.has(property):
-			var class_script = module_data.classes[property]
-			# Return a callable that instantiates the class
-			return func(args):
-				return _instantiate_class(class_script, args)
-		
-		push_warning("ModuleProxy: Property '%s' not found in module '%s'" % [property, name])
-		return null
-	
-	func _instantiate_class(class_script: GDScript, args: Array):
-		# This needs to call back into the interpreter's instantiation logic
-		# We'll need to pass a reference to the interpreter
-		if interpreter_ref:
-			return interpreter_ref.instantiate_gdscript_class(class_script, args)
-		return null
-	
-	var interpreter_ref  # Add this reference when creating ModuleProxy
