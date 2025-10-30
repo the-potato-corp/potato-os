@@ -13,7 +13,12 @@ func define(name: String, value: Variant, is_const: bool = false) -> void:
 		constants.append(name)
 
 func has(name: String):
-	return variables.has(name)
+	if variables.has(name):
+		return true
+	elif parent:
+		return parent.has(name)
+	else:
+		return false
 
 func get_var(name: String):
 	if variables.has(name):

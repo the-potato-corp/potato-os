@@ -139,6 +139,15 @@ func run(code: Program) -> EvalError:
 	had_error = false
 	last_error = null
 	
+	# function hoisting??
+	for node in code.statements:
+		if node is ASTFunctionDeclaration:
+			# Store both the function AND the environment it was defined in
+			functions[node.name] = {
+				"def": node,
+				"env": current_env  # Capture definition environment
+			}
+	
 	for node in code.statements:
 		if had_error:
 			break
@@ -192,7 +201,6 @@ func eval(node: ASTNode):
 			return eval_function_call(node)
 		
 		"ASTFunctionDeclaration":
-			functions[node.name] = node
 			return null
 		
 		"ASTVarDeclaration":
@@ -459,11 +467,20 @@ func call_method(obj, method_name: String, args: Array):
 	raise_error(EvalError.new(EvalError.TYPE_ERROR, "Method '%s' not supported for type %s" % [method_name, type_string(typeof(obj))]))
 	return null
 
-func call_user_function(func_def: ASTFunctionDeclaration, arguments: Array, call_node: ASTFunctionCall):
-	var new_env = EvalEnvironment.new(current_env)
+func call_user_function(func_def, arguments: Array, call_node: ASTFunctionCall):
+	var definition_env = global_env  # Default to global
+	var actual_func_def = func_def
 	
-	for i in range(func_def.parameters.size()):
-		var param = func_def.parameters[i]
+	# Check if it's wrapped with environment
+	if func_def is Dictionary and func_def.has("def"):
+		actual_func_def = func_def.def
+		definition_env = func_def.env
+	
+	# Create new env from DEFINITION environment, not current
+	var new_env = EvalEnvironment.new(definition_env)
+	
+	for i in range(actual_func_def.parameters.size()):
+		var param = actual_func_def.parameters[i]
 		var value
 		
 		if i < arguments.size():
@@ -486,7 +503,7 @@ func call_user_function(func_def: ASTFunctionDeclaration, arguments: Array, call
 	return_value = null
 	
 	var result = null
-	for statement in func_def.body:
+	for statement in actual_func_def.body:
 		result = eval(statement)
 		if had_error or should_break or should_continue or should_return:
 			break
@@ -498,8 +515,8 @@ func call_user_function(func_def: ASTFunctionDeclaration, arguments: Array, call
 		should_return = false
 		return_value = null
 	
-	if func_def.return_type and func_def.return_type != "" and func_def.return_type != "void":
-		if not check_type(result, func_def.return_type):
+	if actual_func_def.return_type and actual_func_def.return_type != "" and actual_func_def.return_type != "void":
+		if not check_type(result, actual_func_def.return_type):
 			return null
 	
 	return result
