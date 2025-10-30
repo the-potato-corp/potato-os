@@ -5,8 +5,10 @@ var _handle: int
 
 var _dragging: bool = false
 var _drag_offset: Vector2 = Vector2()
+
 var _title_bar: Control
 var _content: Control
+var _title: Label
 
 enum ResizeMode {
 	NONE,
@@ -54,6 +56,9 @@ var maximized: bool = false
 	set(val): _set_setting("focusable", val)
 @export var resizable: bool = true:
 	set(val): _set_setting("resizable", val)
+
+func set_title(title: String):
+	_title.text = title
 
 func toggle_size():
 	if maximized:
@@ -140,6 +145,7 @@ func _init() -> void:
 	var title := Label.new()
 	title.text = "Untitled Window"
 	info.add_child(title)
+	_title = title
 	
 	# action buttons
 	var buttons := HBoxContainer.new()
