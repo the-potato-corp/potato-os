@@ -1,7 +1,7 @@
 extends Node
 
 @export var main_scene: PackedScene
-var base_url: String = "http://localhost:5500/" if OS.has_feature("editor") else "http://potato-os.github.io/" # dev
+var base_url: String = "http://127.0.0.1:5500/" if OS.has_feature("editor") else "http://potato-os.github.io/" # dev
 var stream: String = "latest"
 var version: String = "v0.0.0"
 var update: bool = false
