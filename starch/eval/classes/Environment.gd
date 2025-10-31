@@ -33,8 +33,27 @@ func set_var(name: String, value: Variant) -> void:
 	if name in constants:
 		push_error("Cannot reassign constant: " + name)
 		return
+	
+	# If variable exists here, update it
 	if variables.has(name):
+		variables[name] = value
+	# Otherwise walk up parent chain
+	elif parent:
+		parent.set_var(name, value)
+	else:
+		# Variable doesn't exist anywhere, create it here
 		variables[name] = value
 
 func can_set(name: String) -> bool:
-	return name not in constants
+	# Check if it's a constant here
+	if name in constants:
+		return false
+	# If variable exists here, it's settable (not const)
+	if variables.has(name):
+		return true
+	# Check parent chain
+	elif parent:
+		return parent.can_set(name)
+	else:
+		# Doesn't exist yet, so it's settable
+		return true
