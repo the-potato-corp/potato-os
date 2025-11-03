@@ -1,7 +1,8 @@
-[gd_scene load_steps=4 format=3 uid="uid://dnpy061ln7mr6"]
+[gd_scene load_steps=5 format=3 uid="uid://dnpy061ln7mr6"]
 
 [ext_resource type="Script" uid="uid://dqfqg1iyap2cs" path="res://installation/installer.gd" id="1_ji48n"]
 [ext_resource type="PackedScene" uid="uid://disytg44ccvuw" path="res://etc/main.tscn" id="2_s2yil"]
+[ext_resource type="Texture2D" uid="uid://duc756nb8hook" path="res://icon.svg" id="3_npqrx"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_s2yil"]
 bg_color = Color(0.19434926, 0.19434929, 0.19434917, 1)
@@ -45,6 +46,7 @@ grow_horizontal = 2
 [node name="Image" type="TextureRect" parent="Control/Wordmark"]
 unique_name_in_owner = true
 layout_mode = 2
+texture = ExtResource("3_npqrx")
 
 [node name="Logo" type="Label" parent="Control/Wordmark"]
 unique_name_in_owner = true
