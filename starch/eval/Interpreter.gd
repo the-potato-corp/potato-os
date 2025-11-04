@@ -399,7 +399,7 @@ func eval_function_call(node: ASTFunctionCall):
 		# If it's a callable (function from module or builtin), just call it
 		if func_or_obj is Callable:
 			print("DEBUG: Calling with args = ", args)
-			var result = func_or_obj.call(args)
+			var result = func_or_obj.callv(args)
 			print("DEBUG: Result = ", result)
 			return result
 		
