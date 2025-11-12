@@ -43,7 +43,7 @@ func parse() -> Error:
 	var program: Program = Program.new([])
 	
 	while current_token != null and current_token.type != "EOF":
-		#print("DEBUG: About to parse statement, current token: ", current_token.type if current_token else "NULL", " = ", current_token.value if current_token else "")
+		print("DEBUG: About to parse statement, current token: ", current_token.type if current_token else "NULL", " = ", current_token.value if current_token else "")
 		var statement: ASTNode = parse_statement()
 		if statement:
 			program.statements.append(statement)
@@ -343,12 +343,18 @@ func parse_function_declaration() -> ASTNode:
 	return ASTFunctionDeclaration.new(func_name, parameters, body, return_type, pos)
 
 func parse_type() -> String:
-	if not current_token or current_token.type != "Identifier":
+	var type_name = ""
+	
+	# Handle 'function' keyword as a type
+	if current_token and current_token.type == "Keyword" and current_token.value == "function":
+		type_name = "function"
+		advance()
+	elif current_token and current_token.type == "Identifier":
+		type_name = current_token.value
+		advance()
+	else:
 		log_text("error", "Expected type name")
 		return ""
-	
-	var type_name = current_token.value
-	advance()
 	
 	# Handle namespaced types (gui.Button, system.File)
 	while current_token and current_token.type == "Dot":

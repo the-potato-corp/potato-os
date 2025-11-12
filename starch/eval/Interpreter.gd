@@ -322,7 +322,7 @@ func check_type(value, type_hint: String) -> bool:
 				raise_error(EvalError.new(EvalError.TYPE_ERROR, "Type mismatch: expected void, got %s" % type_string(typeof(value))))
 				return false
 			return true
-		"array":
+		"array", "list":
 			if typeof(value) != TYPE_ARRAY:
 				raise_error(EvalError.new(EvalError.TYPE_ERROR, "Type mismatch: expected array, got %s" % type_string(typeof(value))))
 				return false
@@ -332,7 +332,48 @@ func check_type(value, type_hint: String) -> bool:
 				raise_error(EvalError.new(EvalError.TYPE_ERROR, "Type mismatch: expected dict, got %s" % type_string(typeof(value))))
 				return false
 			return true
+		"function":
+			if not (value is Callable or value is ASTFunctionDeclaration or value is StarchBoundMethod):
+				raise_error(EvalError.new(EvalError.TYPE_ERROR, "Type mismatch: expected function, got %s" % type_string(typeof(value))))
+				return false
+			return true
 		_:
+			# Handle namespaced types (gui.Button, system.File)
+			if "." in type_hint:
+				var parts = type_hint.split(".")
+				var module_name = parts[0]
+				var starch_class_name = parts[1]
+				
+				# Check if module exists
+				if not modules.has(module_name):
+					raise_error(EvalError.new(EvalError.NAME_ERROR, "Module '%s' is not imported" % module_name))
+					return false
+				
+				# Check if it's a GDScriptInstanceWrapper from that module
+				if value is GDScriptInstanceWrapper:
+					# For GDScript classes, check the actual class name
+					var instance_class = value.gd_instance.get_class()
+					if instance_class == starch_class_name:
+						return true
+					# Also check script class name
+					var script = value.gd_instance.get_script()
+					if script and script.get_global_name() == starch_class_name:
+						return true
+					
+					raise_error(EvalError.new(EvalError.TYPE_ERROR, "Type mismatch: expected %s, got %s" % [type_hint, instance_class]))
+					return false
+				
+				# Check if it's a StarchInstance from that module
+				if value is StarchInstance:
+					if value.name_class == starch_class_name:
+						return true
+					raise_error(EvalError.new(EvalError.TYPE_ERROR, "Type mismatch: expected %s, got %s" % [type_hint, value.name_class]))
+					return false
+				
+				raise_error(EvalError.new(EvalError.TYPE_ERROR, "Type mismatch: expected %s, got %s" % [type_hint, type_string(typeof(value))]))
+				return false
+			
+			# Non-namespaced custom type
 			if classes.has(type_hint):
 				if value is StarchInstance:
 					if value.name_class != type_hint:
@@ -340,11 +381,19 @@ func check_type(value, type_hint: String) -> bool:
 						return false
 					return true
 				elif value is GDScriptInstanceWrapper:
-					# Assuming the type check passed if it's a GDScript wrapper instance matching the import name.
-					return true 
+					# Assuming the type check passed if it's a GDScript wrapper instance matching the import name
+					var instance_class = value.gd_instance.get_class()
+					if instance_class == type_hint:
+						return true
+					var script = value.gd_instance.get_script()
+					if script and script.get_global_name() == type_hint:
+						return true
+					raise_error(EvalError.new(EvalError.TYPE_ERROR, "Type mismatch: expected %s, got %s" % [type_hint, instance_class]))
+					return false
 				else:
 					raise_error(EvalError.new(EvalError.TYPE_ERROR, "Type mismatch: expected %s, got %s" % [type_hint, type_string(typeof(value))]))
 					return false
+			
 			raise_error(EvalError.new(EvalError.NAME_ERROR, "Type '%s' is not defined" % type_hint))
 			return false
 
