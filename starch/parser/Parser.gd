@@ -105,11 +105,9 @@ func parse_var_declaration() -> ASTNode:
 	var type_hint = ""
 	if current_token and current_token.type == "Colon":
 		advance()
-		if not current_token or current_token.type != "Identifier":
-			log_text("error", "Expected type name after ':'")
+		type_hint = parse_type()
+		if type_hint == "":
 			return null
-		type_hint = current_token.value
-		advance()
 	
 	if not current_token or current_token.type != "Assign":
 		log_text("error", "Expected '=' in variable declaration")
@@ -141,6 +139,7 @@ func parse_expression_statement() -> ASTNode:
 
 func parse_block() -> Array:
 	if not current_token or current_token.type != "LBrace":
+		print(current_token.value, ", ", current_token.type)
 		log_text("error", "Expected '{' to start block")
 		return []
 	advance()
@@ -307,11 +306,9 @@ func parse_function_declaration() -> ASTNode:
 		
 		if current_token and current_token.type == "Colon":
 			advance()
-			if not current_token or current_token.type != "Identifier":
-				log_text("error", "Expected type name after ':'")
+			param_type = parse_type()
+			if param_type == "":
 				return null
-			param_type = current_token.value
-			advance()
 		
 		if current_token and current_token.type == "Keyword" and current_token.value == "or":
 			advance()
@@ -335,17 +332,34 @@ func parse_function_declaration() -> ASTNode:
 	var return_type = ""
 	if current_token and current_token.type == "Arrow":
 		advance()
-		if not current_token or current_token.type not in ["Identifier", "Keyword"]:
-			log_text("error", "Expected return type after '->'")
+		return_type = parse_type()
+		if return_type == "":
 			return null
-		return_type = current_token.value
-		advance()
 	
 	var body = parse_block()
 	if body.is_empty() and _error:
 		return null
 	
 	return ASTFunctionDeclaration.new(func_name, parameters, body, return_type, pos)
+
+func parse_type() -> String:
+	if not current_token or current_token.type != "Identifier":
+		log_text("error", "Expected type name")
+		return ""
+	
+	var type_name = current_token.value
+	advance()
+	
+	# Handle namespaced types (gui.Button, system.File)
+	while current_token and current_token.type == "Dot":
+		advance()
+		if not current_token or current_token.type != "Identifier":
+			log_text("error", "Expected identifier after '.' in type")
+			return ""
+		type_name += "." + current_token.value
+		advance()
+	
+	return type_name
 
 func parse_class_declaration() -> ASTNode:
 	var pos = current_token.get_position()
