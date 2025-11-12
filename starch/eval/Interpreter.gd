@@ -665,7 +665,7 @@ func eval_binary_op(node: ASTBinaryOp):
 			return left / right
 		"%": return left % right
 		"^": return pow(left, right)
-		"++": return str(left) + str(right)
+		"~": return str(left) + str(right)
 		"==": return left == right
 		"!=": return left != right
 		"<": return left < right
