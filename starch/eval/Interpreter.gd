@@ -351,16 +351,19 @@ func check_type(value, type_hint: String) -> bool:
 				
 				# Check if it's a GDScriptInstanceWrapper from that module
 				if value is GDScriptInstanceWrapper:
-					# For GDScript classes, check the actual class name
+					# Check script's global class name first
+					var script = value.gd_instance.get_script()
+					if script:
+						var global_name = script.get_global_name()
+						if global_name == starch_class_name or global_name == type_hint:
+							return true
+					
+					# Fallback to get_class() (probably won't help but doesn't hurt)
 					var instance_class = value.gd_instance.get_class()
 					if instance_class == starch_class_name:
 						return true
-					# Also check script class name
-					var script = value.gd_instance.get_script()
-					if script and script.get_global_name() == starch_class_name:
-						return true
 					
-					raise_error(EvalError.new(EvalError.TYPE_ERROR, "Type mismatch: expected %s, got %s" % [type_hint, instance_class]))
+					raise_error(EvalError.new(EvalError.TYPE_ERROR, "Type mismatch: expected %s, got %s" % [type_hint, script.get_global_name() if script else instance_class]))
 					return false
 				
 				# Check if it's a StarchInstance from that module
@@ -381,14 +384,19 @@ func check_type(value, type_hint: String) -> bool:
 						return false
 					return true
 				elif value is GDScriptInstanceWrapper:
-					# Assuming the type check passed if it's a GDScript wrapper instance matching the import name
+					# Check script's global class name first
+					var script = value.gd_instance.get_script()
+					if script:
+						var global_name = script.get_global_name()
+						if global_name == type_hint:
+							return true
+					
+					# Fallback to get_class() (probably won't help but doesn't hurt)
 					var instance_class = value.gd_instance.get_class()
 					if instance_class == type_hint:
 						return true
-					var script = value.gd_instance.get_script()
-					if script and script.get_global_name() == type_hint:
-						return true
-					raise_error(EvalError.new(EvalError.TYPE_ERROR, "Type mismatch: expected %s, got %s" % [type_hint, instance_class]))
+					
+					raise_error(EvalError.new(EvalError.TYPE_ERROR, "Type mismatch: expected %s, got %s" % [type_hint, script.get_global_name() if script else instance_class]))
 					return false
 				else:
 					raise_error(EvalError.new(EvalError.TYPE_ERROR, "Type mismatch: expected %s, got %s" % [type_hint, type_string(typeof(value))]))
