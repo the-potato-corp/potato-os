@@ -14,6 +14,7 @@ var current_file_path: String = ""
 var loaded_modules: Dictionary = {}
 var modules: Dictionary = {}
 var allowed_modules: Array = []
+var class_type_registry: Dictionary = {}
 
 func _init() -> void:
 	global_env = EvalEnvironment.new()
@@ -338,69 +339,32 @@ func check_type(value, type_hint: String) -> bool:
 				return false
 			return true
 		_:
-			# Handle namespaced types (gui.Button, system.File)
-			if "." in type_hint:
-				var parts = type_hint.split(".")
-				var module_name = parts[0]
-				var starch_class_name = parts[1]
+			# Check if it's a GDScriptInstanceWrapper against registry
+			if value is GDScriptInstanceWrapper:
+				var instance = value.gd_instance
 				
-				# Check if module exists
-				if not modules.has(module_name):
-					raise_error(EvalError.new(EvalError.NAME_ERROR, "Module '%s' is not imported" % module_name))
-					return false
-				
-				# Check if it's a GDScriptInstanceWrapper from that module
-				if value is GDScriptInstanceWrapper:
-					# Check script's global class name first
-					var script = value.gd_instance.get_script()
-					if script:
-						var global_name = script.get_global_name()
-						if global_name == starch_class_name or global_name == type_hint:
+				# Check registry for matching type
+				for registered_class in class_type_registry:
+					if instance.get_script() == registered_class:
+						var valid_names = class_type_registry[registered_class]
+						if type_hint in valid_names:
 							return true
-					
-					# Fallback to get_class() (probably won't help but doesn't hurt)
-					var instance_class = value.gd_instance.get_class()
-					if instance_class == starch_class_name:
-						return true
-					
-					raise_error(EvalError.new(EvalError.TYPE_ERROR, "Type mismatch: expected %s, got %s" % [type_hint, script.get_global_name() if script else instance_class]))
-					return false
 				
-				# Check if it's a StarchInstance from that module
-				if value is StarchInstance:
-					if value.name_class == starch_class_name:
-						return true
-					raise_error(EvalError.new(EvalError.TYPE_ERROR, "Type mismatch: expected %s, got %s" % [type_hint, value.name_class]))
-					return false
-				
-				raise_error(EvalError.new(EvalError.TYPE_ERROR, "Type mismatch: expected %s, got %s" % [type_hint, type_string(typeof(value))]))
+				# If not in registry, fail
+				raise_error(EvalError.new(EvalError.TYPE_ERROR, "Type mismatch: expected %s, got unregistered GDScript instance" % type_hint))
 				return false
 			
-			# Non-namespaced custom type
-			if classes.has(type_hint):
-				if value is StarchInstance:
-					if value.name_class != type_hint:
-						raise_error(EvalError.new(EvalError.TYPE_ERROR, "Type mismatch: expected %s, got %s" % [type_hint, value.name_class]))
-						return false
+			# Check StarchInstance
+			if value is StarchInstance:
+				if value.name_class == type_hint:
 					return true
-				elif value is GDScriptInstanceWrapper:
-					# Check script's global class name first
-					var script = value.gd_instance.get_script()
-					if script:
-						var global_name = script.get_global_name()
-						if global_name == type_hint:
-							return true
-					
-					# Fallback to get_class() (probably won't help but doesn't hurt)
-					var instance_class = value.gd_instance.get_class()
-					if instance_class == type_hint:
-						return true
-					
-					raise_error(EvalError.new(EvalError.TYPE_ERROR, "Type mismatch: expected %s, got %s" % [type_hint, script.get_global_name() if script else instance_class]))
-					return false
-				else:
-					raise_error(EvalError.new(EvalError.TYPE_ERROR, "Type mismatch: expected %s, got %s" % [type_hint, type_string(typeof(value))]))
-					return false
+				raise_error(EvalError.new(EvalError.TYPE_ERROR, "Type mismatch: expected %s, got %s" % [type_hint, value.name_class]))
+				return false
+			
+			# Check if it's a defined STARCH class
+			if classes.has(type_hint):
+				raise_error(EvalError.new(EvalError.TYPE_ERROR, "Type mismatch: expected %s, got %s" % [type_hint, type_string(typeof(value))]))
+				return false
 			
 			raise_error(EvalError.new(EvalError.NAME_ERROR, "Type '%s' is not defined" % type_hint))
 			return false
@@ -1229,9 +1193,19 @@ func eval_using(node: ASTUsingStatement):
 		if not load_module(module_path):
 			return null
 	
-	# Create proxy with interpreter reference
+	var module_data = loaded_modules[module_path]
+	for name_class in module_data.classes:
+		var class_def = module_data.classes[name_class]
+		if class_def is GDScript:
+			if not class_type_registry.has(class_def):
+				class_type_registry[class_def] = []
+			
+			var namespaced_name = module_name + "." + name_class
+			if namespaced_name not in class_type_registry[class_def]:
+				class_type_registry[class_def].append(namespaced_name)
+	
 	var proxy = ModuleProxy.new(module_name, loaded_modules[module_path])
-	proxy.interpreter_ref = self  # ADD THIS
+	proxy.interpreter_ref = self
 	modules[module_name] = proxy
 	
 	return null
@@ -1245,19 +1219,32 @@ func eval_using_from(node: ASTUsingFromStatement):
 		raise_error(EvalError.new(EvalError.NAME_ERROR, "Module '%s' not found" % module_name))
 		return null
 	
-	# Load the module if not already loaded
 	if not loaded_modules.has(module_path):
 		if not load_module(module_path):
 			return null
 	
-	# Import specified items into global scope
 	var module_data = loaded_modules[module_path]
 	
 	for item_name in imports:
 		if module_data.functions.has(item_name):
 			functions[item_name] = module_data.functions[item_name]
 		elif module_data.classes.has(item_name):
-			classes[item_name] = module_data.classes[item_name]
+			var class_def = module_data.classes[item_name]
+			classes[item_name] = class_def
+			
+			# Register type names for GDScript classes
+			if class_def is GDScript:
+				if not class_type_registry.has(class_def):
+					class_type_registry[class_def] = []
+				
+				# Add both the imported name and the namespaced name
+				if item_name not in class_type_registry[class_def]:
+					class_type_registry[class_def].append(item_name)
+				
+				var namespaced_name = module_name + "." + item_name
+				if namespaced_name not in class_type_registry[class_def]:
+					class_type_registry[class_def].append(namespaced_name)
+			
 			functions[item_name] = func(args):
 				return instantiate_class(item_name, args)
 		else:
