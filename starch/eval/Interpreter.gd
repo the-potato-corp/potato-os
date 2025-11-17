@@ -1457,14 +1457,14 @@ func load_gdscript_module(module_path: String) -> bool:
 						# Store a wrapper function to ensure the Starch calling convention
 						# (single array argument) is mapped correctly to the GDScript signature.
 						var wrapped_callable = func(starch_args_array):
-							# Starch passes one argument: the array of parameters (starch_args_array)
-
-							# FIX: Pass the array of arguments directly to callv.
-							# Do NOT wrap it in another array.
+							print("WRAPPER: Calling method '", method_name, "' with args: ", starch_args_array)
+							print("WRAPPER: instance has method? ", instance.has_method(method_name))
+							
 							if instance.has_method(method_name):
-								return instance.callv(method_name, starch_args_array)
+								var result = instance.callv(method_name, starch_args_array)
+								print("WRAPPER: Result = ", result)
+								return result
 							else:
-								# Fallback for bare callables (less common for module exports)
 								return callable_obj.callv(starch_args_array)
 
 						module_data.functions[method_name] = wrapped_callable
