@@ -31,6 +31,7 @@ func set_file_path(path: String) -> void:
 
 func setup_builtins() -> void:
 	functions["print"] = func(...args):
+		print("Printing with args: ", args)
 		print(" ".join(args))
 		return null
 
@@ -394,7 +395,10 @@ func eval_function_call(node: ASTFunctionCall):
 					args.append(eval(arg))
 					if had_error:
 						return null
-				return potential_func.callv(args)
+				print("DEBUG: About to call bound function with args: ", args)
+				var result = potential_func.callv(args)
+				print("DEBUG: Bound function returned: ", result)
+				return result
 			
 		# Then check functions dict (existing logic)
 		if not functions.has(func_name):
