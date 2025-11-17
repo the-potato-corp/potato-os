@@ -978,43 +978,50 @@ func eval_slice_access(node: ASTSliceAccess):
 	var obj = eval(node.object)
 	if had_error:
 		return null
-
+	
+	var obj_size = obj.size() if typeof(obj) == TYPE_ARRAY else obj.length()
+	
 	var start = 0
-	var end = 0
+	var end = obj_size
 	var step = 1
-
+	
 	if node.start:
 		start = eval(node.start)
 		if had_error:
 			return null
-
+		# Handle negative indexing
+		if start < 0:
+			start = obj_size + start
+	
 	if node.end:
 		end = eval(node.end)
 		if had_error:
 			return null
-	else:
-		if typeof(obj) in [TYPE_ARRAY, TYPE_STRING]:
-			end = obj.size() if typeof(obj) == TYPE_ARRAY else obj.length()
-
+		# Handle negative indexing
+		if end < 0:
+			end = obj_size + end
+	
 	if node.step:
 		step = eval(node.step)
 		if had_error:
 			return null
-
+	
+	# Clamp to valid range
+	start = clampi(start, 0, obj_size)
+	end = clampi(end, 0, obj_size)
+	
 	if typeof(obj) == TYPE_ARRAY:
 		var result = []
 		var i = start
 		while (step > 0 and i < end) or (step < 0 and i > end):
-			if i >= 0 and i < obj.size():
-				result.append(obj[i])
+			result.append(obj[i])
 			i += step
 		return result
 	elif typeof(obj) == TYPE_STRING:
 		var result = ""
 		var i = start
 		while (step > 0 and i < end) or (step < 0 and i > end):
-			if i >= 0 and i < obj.length():
-				result += obj[i]
+			result += obj[i]
 			i += step
 		return result
 	else:
