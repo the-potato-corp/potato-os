@@ -130,6 +130,19 @@ func setup_builtins() -> void:
 		current_env = prev_env
 
 		return null
+	
+	functions["eval"] = func(exp):
+		var lexer := Lexer.new(exp)
+		var err = lexer.lex()
+		if err != OK:
+			return err
+		var parser := Parser.new(lexer.get_tokens())
+		err = parser.parse()
+		if err != OK:
+			return err
+		var eval := Interpreter.new()
+		eval.set_file_path(current_file_path)
+		eval.run(parser.get_program())
 
 func raise_error(error: EvalError) -> void:
 	push_error(error.message)
