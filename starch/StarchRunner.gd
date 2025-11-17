@@ -9,6 +9,7 @@ func run() -> void:
 	var code: String = FileAccess.get_file_as_string(location)
 	code = code.replace("\r\n", "\n") # I FRICKING HATE UNIX/WINDOWS DIFFERENCES GOD THIS TOOK LITERAL HOURS TO RESOLVE
 	# (nissemanen) why dont you just make the lexer (or what ever has problems with them) treat them both ("\r\n" and "\n") the same way?
+	# (red) too lazy
 	
 	var lexer: Lexer = Lexer.new(code)
 	var error: Error = lexer.lex()
