@@ -13,7 +13,7 @@ func _init(instance):
 func _get(property):
 	print("    _GET CALLED FOR: ", property)
 	var actual_property = property
-	var wrapper_ref = self  # Capture wrapper reference at the start
+	var wrapper_ref = self
 	
 	if _method_remap.has(property):
 		var remap_target = _method_remap[property]
@@ -25,19 +25,23 @@ func _get(property):
 				print("      CALLABLE LAMBDA EXECUTING")
 				var result = remap_target.callv(args)
 				print("      Result: ", result)
-				print("      Result ID: ", result.get_instance_id() if result != null else "null")
-				print("      gd_instance ID: ", wrapper_ref.gd_instance.get_instance_id())
-				# If result is self (builder pattern), return wrapper
-				if result != null and result.get_instance_id() == wrapper_ref.gd_instance.get_instance_id():
-					print("      IDs MATCH! Returning wrapper")
-					return wrapper_ref
-				print("      IDs don't match, returning raw result")
+				
+				# Only check instance ID for Objects
+				if result is Object and result != null:
+					print("      Result ID: ", result.get_instance_id())
+					print("      gd_instance ID: ", wrapper_ref.gd_instance.get_instance_id())
+					if result.get_instance_id() == wrapper_ref.gd_instance.get_instance_id():
+						print("      IDs MATCH! Returning wrapper")
+						return wrapper_ref
+				
+				print("      Returning raw result (primitive or different object)")
 				return result
 	
 	if gd_instance.has_method(actual_property):
 		return func(args):
 			var result = gd_instance.callv(actual_property, args)
-			if result != null and result.get_instance_id() == wrapper_ref.gd_instance.get_instance_id():
+			# Only wrap if result is the same Object instance
+			if result is Object and result != null and result.get_instance_id() == wrapper_ref.gd_instance.get_instance_id():
 				return wrapper_ref
 			return result
 	

@@ -14,4 +14,9 @@ func _init(object: ASTNode, start: ASTNode, end: ASTNode, step: ASTNode, positio
 	self.step = step
 
 func serialise():
-	return "SliceAccess(%s, %s, %s, %s)" % [object.serialise(), start.serialise(), end.serialise(), step.serialise()]
+	return "SliceAccess(%s, %s, %s, %s)" % [
+		object.serialise(),
+		start.serialise() if start else "null",
+		end.serialise() if end else "null",
+		step.serialise() if step else "null"
+	]
