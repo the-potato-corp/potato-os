@@ -142,7 +142,8 @@ func setup_builtins() -> void:
 			return err
 		var eval := Interpreter.new()
 		eval.set_file_path(current_file_path)
-		eval.run(parser.get_program())
+		# Don't full run; just eval this node
+		return eval.eval(parser.get_program().statements[0])
 
 func raise_error(error: EvalError) -> void:
 	push_error(error.message)
