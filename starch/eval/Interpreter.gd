@@ -132,6 +132,7 @@ func setup_builtins() -> void:
 		return null
 	
 	functions["eval"] = func(exp):
+		print("EVAL called through STARCH")
 		var lexer := Lexer.new(exp)
 		var err = lexer.lex()
 		if err != OK:
@@ -143,7 +144,10 @@ func setup_builtins() -> void:
 		var eval := Interpreter.new()
 		eval.set_file_path(current_file_path)
 		# Don't full run; just eval this node
-		return eval.eval(parser.get_program().statements[0])
+		var resp = eval.eval(parser.get_program().statements[0])
+		print(resp)
+		print("EVAL done")
+		return resp
 
 func raise_error(error: EvalError) -> void:
 	push_error(error.message)
