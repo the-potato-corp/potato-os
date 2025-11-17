@@ -30,47 +30,46 @@ func set_file_path(path: String) -> void:
 	current_file_path = path
 
 func setup_builtins() -> void:
-	functions["print"] = func(args):
-		if args.size() > 0:
-			print(args[0])
+	functions["print"] = func(...args):
+		print(" ".join(args))
 		return null
 
-	functions["len"] = func(args):
+	functions["len"] = func(...args):
 		if args.size() > 0:
 			var val = args[0]
 			if typeof(val) in [TYPE_STRING, TYPE_ARRAY, TYPE_DICTIONARY]:
 				return val.size()
 		return 0
 
-	functions["upper"] = func(args):
+	functions["upper"] = func(...args):
 		return str(args[0]).to_upper() if args.size() > 0 else ""
 
-	functions["lower"] = func(args):
+	functions["lower"] = func(...args):
 		return str(args[0]).to_lower() if args.size() > 0 else ""
 
-	functions["replace"] = func(args):
+	functions["replace"] = func(...args):
 		if args.size() >= 3:
 			return str(args[0]).replace(str(args[1]), str(args[2]))
 		return args[0] if args.size() > 0 else ""
 
-	functions["str"] = func(args):
+	functions["str"] = func(...args):
 		return str(args[0]) if args.size() > 0 else ""
 
-	functions["int"] = func(args):
+	functions["int"] = func(...args):
 		return int(args[0]) if args.size() > 0 else 0
 
-	functions["float"] = func(args):
+	functions["float"] = func(...args):
 		return float(args[0]) if args.size() > 0 else 0.0
 
-	functions["bool"] = func(args):
+	functions["bool"] = func(...args):
 		return bool(args[0]) if args.size() > 0 else false
 
-	functions["type"] = func(args):
+	functions["type"] = func(...args):
 		if args.size() > 0:
 			return type_string(typeof(args[0]))
 		return "unknown"
 
-	functions["super"] = func(args):
+	functions["super"] = func(...args):
 		if not current_env.has("this"):
 			raise_error(EvalError.new(EvalError.RUNTIME_ERROR, "super() can only be called from within a class method"))
 			return null
@@ -395,8 +394,8 @@ func eval_function_call(node: ASTFunctionCall):
 					args.append(eval(arg))
 					if had_error:
 						return null
-				return potential_func.call(args)
-		
+				return potential_func.callv(args)
+			
 		# Then check functions dict (existing logic)
 		if not functions.has(func_name):
 			raise_error(EvalError.new(EvalError.NAME_ERROR, "function '%s' is not defined" % func_name))
@@ -411,7 +410,7 @@ func eval_function_call(node: ASTFunctionCall):
 				return null
 
 		if func_def is Callable:
-			return func_def.call(args)
+			return func_def.callv(args)
 
 		return call_user_function(func_def, args, node)
 
@@ -432,7 +431,7 @@ func eval_function_call(node: ASTFunctionCall):
 		# If it's a callable (function from module or builtin), just call it
 		if func_or_obj is Callable:
 			print("DEBUG: Calling with args = ", args)
-			var result = func_or_obj.call(args)
+			var result = func_or_obj.callv(args)
 			print("DEBUG: Result = ", result)
 			return result
 
@@ -470,7 +469,7 @@ func eval_function_call(node: ASTFunctionCall):
 			if had_error:
 				return null
 
-		return func_val.call(args)
+		return func_val.callv(args)
 
 func call_method(obj, method_name: String, args: Array):
 	match method_name:
